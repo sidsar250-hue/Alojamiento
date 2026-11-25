@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="section-title mb-0">Reportes e Indicadores Gerenciales</h2>
+    <p class="text-muted small mb-0">Consolidado de reservas, ocupación, ingresos y huéspedes</p>
+  </div>
+  <button onclick="window.print()" class="btn btn-outline-teal"><i class="bi bi-printer me-1"></i> Imprimir Reporte</button>
+</div>
+
+<form method="get" class="card-syshsena p-3 mb-4">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small">Desde</label>
+      <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.fecha_inicio }}">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small">Hasta</label>
+      <input type="date" name="fecha_fin" class="form-control" value="{{ filtros.fecha_fin }}">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small">Estado de Reserva</label>
+      <select name="estado" class="form-select">
+        <option value="">Todos</option>
+        {% for val, lbl in estados %}
+          <option value="{{ val }}" {% if filtros.estado == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-teal w-100">Generar</button>
+    </div>
+  </div>
+</form>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card-syshsena p-3">
+      <div class="small text-muted">Total Ingresos Periodo</div>
+      <div class="fs-3 fw-bold text-success">${{ total_recaudado|floatformat:0|intcomma }}</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card-syshsena p-3">
+      <div class="small text-muted">Ocupación Hotelera</div>
+      <div class="fs-3 fw-bold section-title">{{ porcentaje_ocupacion }}% ({{ ocupadas }}/{{ total_habitaciones }})</div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card-syshsena p-3">
+      <div class="small text-muted">Reservas Filtradas</div>
+      <div class="fs-3 fw-bold" style="color: var(--primary-teal);">{{ reservas|length }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card-syshsena p-3 mb-4">
+  <h5 class="section-title mb-3">Reporte Detallado de Reservas</h5>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Huésped</th>
+          <th>Habitación</th>
+          <th>Fechas</th>
+          <th>Total</th>
+          <th>Pagado</th>
+          <th>Saldo</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reservas %}
+          <tr>
+            <td class="fw-bold">{{ r.codigo }}</td>
+            <td>{{ r.huesped.nombre_completo }}</td>
+            <td>Hab. {{ r.habitacion.numero }}</td>
+            <td class="small">{{ r.fecha_entrada }} al {{ r.fecha_salida }}</td>
+            <td>${{ r.valor_total|floatformat:0|intcomma }}</td>
+            <td class="text-success">${{ r.valor_pagado|floatformat:0|intcomma }}</td>
+            <td class="text-danger">${{ r.saldo_pendiente|floatformat:0|intcomma }}</td>
+            <td><span class="badge badge-teal">{{ r.get_estado_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="8" class="text-center py-3 text-muted">Sin resultados para el periodo seleccionado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

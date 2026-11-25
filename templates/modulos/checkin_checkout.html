@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<h2 class="section-title mb-1">Operación: Check-in y Check-out</h2>
+<p class="text-muted small mb-4">Control de llegadas, ocupación de habitaciones y liquidación de salidas</p>
+
+<div class="row g-4">
+  <!-- Llegadas pendientes de Check-in -->
+  <div class="col-lg-6">
+    <div class="card-syshsena p-3 h-100">
+      <h5 class="section-title mb-3"><i class="bi bi-box-arrow-in-right text-success me-1"></i> Pendientes de Check-in</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Reserva</th>
+              <th>Huésped</th>
+              <th>Hab.</th>
+              <th>Entrada</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in reservas_llegada %}
+              <tr>
+                <td class="fw-bold">{{ r.codigo }}</td>
+                <td>{{ r.huesped.nombre_completo }}</td>
+                <td>#{{ r.habitacion.numero }}</td>
+                <td class="small">{{ r.fecha_entrada }}</td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'procesar_checkin' r.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-teal">Registrar Check-in</button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-center text-muted py-3">Sin llegadas pendientes.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Huéspedes hospedados (Check-out) -->
+  <div class="col-lg-6">
+    <div class="card-syshsena p-3 h-100">
+      <h5 class="section-title mb-3"><i class="bi bi-box-arrow-right text-danger me-1"></i> En Estadía (Check-out)</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Reserva</th>
+              <th>Huésped</th>
+              <th>Hab.</th>
+              <th>Saldo</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in reservas_hospedadas %}
+              <tr>
+                <td class="fw-bold">{{ r.codigo }}</td>
+                <td>{{ r.huesped.nombre_completo }}</td>
+                <td>#{{ r.habitacion.numero }}</td>
+                <td class="fw-semibold {% if r.saldo_pendiente > 0 %}text-danger{% else %}text-success{% endif %}">
+                  ${{ r.saldo_pendiente|floatformat:0|intcomma }}
+                </td>
+                <td class="text-end">
+                  <form method="post" action="{% url 'procesar_checkout' r.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Check-out</button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-center text-muted py-3">No hay huéspedes hospedados actualmente.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

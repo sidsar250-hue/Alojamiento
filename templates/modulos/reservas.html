@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="section-title mb-0">Gestión de Reservas</h2>
+    <p class="text-muted small mb-0">Control de disponibilidad, cruce de fechas y estados</p>
+  </div>
+  {% if rol_actual == 'Administrador' or rol_actual == 'Recepcionista' %}
+  <button class="btn btn-teal" data-bs-toggle="modal" data-bs-target="#modalNuevaReserva">+ Nueva Reserva</button>
+  {% endif %}
+</div>
+
+<form method="get" class="card-syshsena p-3 mb-4">
+  <div class="row g-2">
+    <div class="col-md-6">
+      <input type="text" name="q" class="form-control" placeholder="Código, huésped, documento o habitación..." value="{{ filtros.q }}">
+    </div>
+    <div class="col-md-4">
+      <select name="estado" class="form-select">
+        <option value="">Todos los estados</option>
+        {% for val, lbl in estados %}
+          <option value="{{ val }}" {% if filtros.estado == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-outline-teal w-100">Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<div class="card-syshsena p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Huésped</th>
+          <th>Habitación</th>
+          <th>Fechas</th>
+          <th>Total / Saldo</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in page_obj %}
+          <tr>
+            <td class="fw-bold">{{ r.codigo }}</td>
+            <td>
+              <div>{{ r.huesped.nombre_completo }}</div>
+              <small class="text-muted">{{ r.huesped.numero_documento }}</small>
+            </td>
+            <td>Hab. {{ r.habitacion.numero }} ({{ r.habitacion.alojamiento.nombre }})</td>
+            <td class="small">{{ r.fecha_entrada }} → {{ r.fecha_salida }} ({{ r.noches }}n)</td>
+            <td>
+              <div class="fw-semibold">${{ r.valor_total|floatformat:0|intcomma }}</div>
+              <small class="text-danger">Saldo: ${{ r.saldo_pendiente|floatformat:0|intcomma }}</small>
+            </td>
+            <td><span class="badge badge-teal">{{ r.get_estado_display }}</span></td>
+            <td>
+              {% if r.estado == 'PENDIENTE' or r.estado == 'CONFIRMADA' %}
+                <form method="post" action="{% url 'cambiar_estado_reserva' r.id %}" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="estado" value="CANCELADA">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Cancelar esta reserva?')">Cancelar</button>
+                </form>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center py-4 text-muted">No hay reservas registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modalNuevaReserva" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% url 'crear_reserva' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Registrar Reserva</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Huésped</label>
+            <select name="huesped" class="form-select" required>
+              <option value="" selected disabled>Seleccione un huésped...</option>
+              {% for h in huespedes %}
+                <option value="{{ h.id }}">{{ h.nombre_completo }} ({{ h.numero_documento }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Habitación</label>
+            <select name="habitacion" class="form-select" required>
+              <option value="" selected disabled>Seleccione una habitación...</option>
+              {% for hab in habitaciones %}
+                <option value="{{ hab.id }}">Hab. {{ hab.numero }} - {{ hab.tipo.nombre }} (Cap: {{ hab.capacidad }} | ${{ hab.precio_noche|floatformat:0 }}/n)</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Fecha de Entrada</label>
+            <input type="date" name="fecha_entrada" class="form-control" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Fecha de Salida</label>
+            <input type="date" name="fecha_salida" class="form-control" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">N° Huéspedes</label>
+            <input type="number" name="numero_huespedes" min="1" max="12" value="1" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Observaciones</label>
+            <textarea name="observaciones" rows="2" class="form-control"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Guardar Reserva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

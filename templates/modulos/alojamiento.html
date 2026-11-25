@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h2 class="section-title mb-0"><i class="bi bi-building-gear me-2"></i>Gestión de Alojamiento</h2>
+    <p class="text-muted small mb-0">Configuración del establecimiento, ubicación en La Guajira y galería fotográfica</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if alojamientos %}
+      <form method="get" class="d-flex gap-2">
+        <select name="id" class="form-select form-select-sm" onchange="this.form.submit()">
+          {% for a in alojamientos %}
+            <option value="{{ a.id }}" {% if alojamiento and alojamiento.id == a.id %}selected{% endif %}>{{ a.nombre }} ({{ a.municipio.nombre }})</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% endif %}
+    <a href="{% url 'gestion_alojamiento' %}?nuevo=1" class="btn btn-sm btn-outline-teal">+ Nuevo Establecimiento</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Formulario Principal -->
+  <div class="col-lg-7">
+    <div class="card-syshsena p-4">
+      <h5 class="section-title mb-3">Información del Establecimiento</h5>
+      <form method="post" action="{% url 'guardar_alojamiento' %}" enctype="multipart/form-data" class="row g-3">
+        {% csrf_token %}
+        {% if alojamiento and not request.GET.nuevo %}
+          <input type="hidden" name="alojamiento_id" value="{{ alojamiento.id }}">
+        {% endif %}
+
+        <div class="col-md-8">
+          <label class="form-label fw-semibold">Nombre del alojamiento</label>
+          <input type="text" name="nombre" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.nombre|default:'' }}{% endif %}" placeholder="Ej: Hotel Brisas de Riohacha" required>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Tipo</label>
+          <select name="tipo" class="form-select">
+            {% for val, label in tipos_alojamiento %}
+              <option value="{{ val }}" {% if alojamiento and not request.GET.nuevo and alojamiento.tipo == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Municipio (La Guajira)</label>
+          <select name="municipio" id="selectMunicipio" class="form-select" required>
+            <option value="" disabled {% if not alojamiento or request.GET.nuevo %}selected{% endif %}>Seleccione un municipio...</option>
+            {% for m in municipios %}
+              <option value="{{ m.id }}" data-lat="{{ m.latitud }}" data-lng="{{ m.longitud }}"
+                {% if alojamiento and not request.GET.nuevo and alojamiento.municipio_id == m.id %}selected{% endif %}>
+                {{ m.nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Dirección</label>
+          <input type="text" name="direccion" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.direccion|default:'' }}{% endif %}" placeholder="Calle 1 # 5-20 Av. La Marina" required>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.telefono|default:'' }}{% endif %}" required>
+        </div>
+
+        <div class="col-md-5">
+          <label class="form-label fw-semibold">Correo de contacto</label>
+          <input type="email" name="correo" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.correo|default:'' }}{% endif %}" required>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">Estrellas</label>
+          <input type="number" name="estrellas" min="1" max="5" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.estrellas|default:3 }}{% else %}3{% endif %}" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Latitud (Google Maps)</label>
+          <input type="text" name="latitud" id="inputLatitud" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.latitud|default:'11.544444' }}{% else %}11.544444{% endif %}" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Longitud (Google Maps)</label>
+          <input type="text" name="longitud" id="inputLongitud" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.longitud|default:'-72.907222' }}{% else %}-72.907222{% endif %}" required>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Servicios incluidos en el alojamiento</label>
+          <input type="text" name="servicios_incluidos" class="form-control" value="{% if not request.GET.nuevo %}{{ alojamiento.servicios_incluidos|default:'Wi-Fi, Aire Acondicionado, Parqueadero, Recepción 24h' }}{% else %}Wi-Fi, Aire Acondicionado, Parqueadero, Recepción 24h{% endif %}">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Descripción turística del establecimiento</label>
+          <textarea name="descripcion" rows="3" class="form-control" required>{% if not request.GET.nuevo %}{{ alojamiento.descripcion|default:'' }}{% endif %}</textarea>
+        </div>
+
+        {% if not alojamiento or request.GET.nuevo %}
+        <div class="col-12">
+          <label class="form-label fw-semibold">Fotografías iniciales (puedes seleccionar varias)</label>
+          <input type="file" name="imagenes" accept="image/*" multiple class="form-control">
+        </div>
+        {% endif %}
+
+        <div class="col-12 text-end">
+          <button type="submit" class="btn btn-teal px-4"><i class="bi bi-save me-1"></i> Guardar Información</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Columna Derecha: Google Maps + Galería con Previsualización -->
+  <div class="col-lg-5">
+    <!-- Ubicación en Google Maps -->
+    <div class="card-syshsena p-3 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="section-title mb-0">Ubicación en Google Maps</h5>
+        <span class="badge badge-teal">La Guajira</span>
+      </div>
+      <div id="map-alojamiento"></div>
+      <small class="text-muted d-block mt-2">
+        {% if GOOGLE_MAPS_API_KEY %}
+          Haz clic en el mapa o arrastra el marcador para actualizar latitud y longitud.
+        {% else %}
+          Vista previa activa del mapa. Al seleccionar un municipio se actualizan automáticamente las coordenadas.
+        {% endif %}
+      </small>
+    </div>
+
+    <!-- Galería de Fotografías -->
+    <div class="card-syshsena p-3">
+      <h5 class="section-title mb-2">Galería de Fotografías</h5>
+      {% if alojamiento and not request.GET.nuevo %}
+        <form method="post" action="{% url 'subir_imagenes_alojamiento' alojamiento.id %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div id="dropzoneGaleria" class="dropzone-galeria mb-2">
+            <i class="bi bi-cloud-arrow-up fs-2" style="color: var(--primary-teal);"></i>
+            <div class="fw-semibold small mt-1">Haz clic o arrastra varias fotos aquí</div>
+            <div class="text-muted" style="font-size: 0.78rem;">Formatos JPG, PNG, WEBP • Selección múltiple habilitada</div>
+            <input type="file" name="imagenes" id="inputGaleria" accept="image/*" multiple class="d-none">
+          </div>
+
+          <!-- Previsualización instantánea antes de subir -->
+          <div id="previewGaleria" class="d-flex flex-wrap gap-2 mb-2"></div>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="marcar_principal" id="chkPrincipal">
+              <label class="form-check-label small" for="chkPrincipal">Marcar primera como foto principal</label>
+            </div>
+            <button type="submit" class="btn btn-sm btn-teal"><i class="bi bi-upload me-1"></i> Subir fotos</button>
+          </div>
+        </form>
+
+        <!-- Imágenes ya guardadas -->
+        <div class="row g-2">
+          {% for img in alojamiento.imagenes.all %}
+            <div class="col-6">
+              <div class="gallery-thumb-box">
+                <img src="{{ img.imagen.url }}" class="gallery-card-img" alt="Foto">
+                {% if img.es_principal %}
+                  <span class="badge bg-warning text-dark position-absolute top-0 start-0 m-1">Principal</span>
+                {% endif %}
+                <div class="position-absolute bottom-0 end-0 m-1 d-flex gap-1">
+                  {% if not img.es_principal %}
+                    <a href="{% url 'marcar_imagen_principal' img.id %}" class="btn btn-xs btn-light btn-sm py-0 px-1" title="Hacer principal"><i class="bi bi-star"></i></a>
+                  {% endif %}
+                  <a href="{% url 'eliminar_imagen_alojamiento' img.id %}" class="btn btn-xs btn-danger btn-sm py-0 px-1" onclick="return confirm('¿Eliminar esta foto?')" title="Eliminar"><i class="bi bi-trash"></i></a>
+                </div>
+              </div>
+            </div>
+          {% empty %}
+            <div class="col-12 text-center text-muted small py-2">Sin fotografías cargadas aún.</div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="alert alert-light border small mb-0">
+          Guarda primero los datos básicos del establecimiento para habilitar la galería fotográfica.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  let mapaAdmin = null;
+  let marcadorAdmin = null;
+
+  function obtenerCoordsActuales() {
+    const lat = parseFloat((document.getElementById('inputLatitud').value || '11.544444').replace(',', '.'));
+    const lng = parseFloat((document.getElementById('inputLongitud').value || '-72.907222').replace(',', '.'));
+    return { lat, lng };
+  }
+
+  window.actualizarMarcadorMapa = function(lat, lng) {
+    if (mapaAdmin && marcadorAdmin) {
+      const pos = { lat: lat, lng: lng };
+      marcadorAdmin.setPosition(pos);
+      mapaAdmin.setCenter(pos);
+    } else {
+      const iframe = document.getElementById('iframeMapFallback');
+      if (iframe) {
+        iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&z=14&output=embed`;
+      }
+    }
+  };
+
+  function initMap() {
+    const coords = obtenerCoordsActuales();
+    mapaAdmin = new google.maps.Map(document.getElementById('map-alojamiento'), {
+      zoom: 14,
+      center: coords
+    });
+    marcadorAdmin = new google.maps.Marker({
+      position: coords,
+      map: mapaAdmin,
+      draggable: true
+    });
+
+    mapaAdmin.addListener('click', (e) => {
+      marcadorAdmin.setPosition(e.latLng);
+      document.getElementById('inputLatitud').value = e.latLng.lat().toFixed(6);
+      document.getElementById('inputLongitud').value = e.latLng.lng().toFixed(6);
+    });
+
+    marcadorAdmin.addListener('dragend', (e) => {
+      document.getElementById('inputLatitud').value = e.latLng.lat().toFixed(6);
+      document.getElementById('inputLongitud').value = e.latLng.lng().toFixed(6);
+    });
+  }
+</script>
+{% if GOOGLE_MAPS_API_KEY %}
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&callback=initMap"></script>
+{% else %}
+  <script>
+    const c = obtenerCoordsActuales();
+    document.getElementById('map-alojamiento').innerHTML = `
+      <iframe id="iframeMapFallback" width="100%" height="100%" frameborder="0" style="border:0; border-radius:12px;"
+        src="https://maps.google.com/maps?q=${c.lat},${c.lng}&z=14&output=embed"></iframe>`;
+  </script>
+{% endif %}
+{% endblock %}

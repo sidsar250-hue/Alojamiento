@@ -1,0 +1,76 @@
+{% extends 'base_public.html' %}
+{% block content %}
+<div class="container my-4" style="max-width: 760px;">
+  <div class="card-syshsena p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="section-title mb-0"><i class="bi bi-person-badge me-1"></i> Editar Mi Perfil de Cliente</h4>
+      <a href="{% url 'portal_cliente' %}" class="btn btn-sm btn-outline-secondary">Volver al Portal</a>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+      {% csrf_token %}
+
+      <div class="col-12 d-flex align-items-center gap-3 p-3 rounded-3 bg-white border">
+        {% if huesped.foto_perfil %}
+          <img src="{{ huesped.foto_perfil.url }}" alt="Foto de perfil" class="rounded-circle border" style="width: 80px; height: 80px; object-fit: cover;">
+        {% else %}
+          <div class="rounded-circle text-white d-flex align-items-center justify-content-center fs-2 fw-bold" style="width: 80px; height: 80px; background-color: var(--primary-teal);">
+            {{ huesped.nombres|default:request.user.username|slice:":1"|upper }}
+          </div>
+        {% endif %}
+        <div class="flex-grow-1">
+          <label class="form-label small fw-semibold mb-1">Foto de Perfil</label>
+          <input type="file" name="foto_perfil" accept="image/*" class="form-control form-control-sm">
+          <small class="text-muted">Formatos recomendados: JPG, PNG o WEBP.</small>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Nombres *</label>
+        <input type="text" name="nombres" class="form-control" value="{{ huesped.nombres }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Apellidos *</label>
+        <input type="text" name="apellidos" class="form-control" value="{{ huesped.apellidos }}" required>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold">Tipo de Documento</label>
+        <select name="tipo_documento" class="form-select">
+          <option value="CC" {% if huesped.tipo_documento == 'CC' %}selected{% endif %}>Cédula de Ciudadanía</option>
+          <option value="CE" {% if huesped.tipo_documento == 'CE' %}selected{% endif %}>Cédula de Extranjería</option>
+          <option value="PA" {% if huesped.tipo_documento == 'PA' %}selected{% endif %}>Pasaporte</option>
+          <option value="TI" {% if huesped.tipo_documento == 'TI' %}selected{% endif %}>Tarjeta de Identidad</option>
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label small fw-semibold">Número de Documento *</label>
+        <input type="text" name="numero_documento" class="form-control" value="{{ huesped.numero_documento }}" required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Teléfono</label>
+        <input type="text" name="telefono" class="form-control" value="{{ huesped.telefono }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Correo Electrónico *</label>
+        <input type="email" name="correo" class="form-control" value="{{ huesped.correo }}" required>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Nacionalidad</label>
+        <input type="text" name="nacionalidad" class="form-control" value="{{ huesped.nacionalidad|default:'Colombiana' }}">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-semibold">Contacto de Emergencia</label>
+        <input type="text" name="contacto_emergencia" class="form-control" value="{{ huesped.contacto_emergencia }}">
+      </div>
+
+      <div class="col-12 d-flex justify-content-end gap-2 mt-3">
+        <a href="{% url 'portal_cliente' %}" class="btn btn-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-teal"><i class="bi bi-check-lg me-1"></i> Guardar Perfil</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

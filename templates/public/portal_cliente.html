@@ -1,0 +1,134 @@
+{% extends 'base_public.html' %}
+{% load humanize %}
+{% block content %}
+<div class="container my-4">
+  <div class="card-syshsena p-4 mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+      <div class="d-flex align-items-center gap-3">
+        {% if huesped.foto_perfil %}
+          <img src="{{ huesped.foto_perfil.url }}" alt="{{ huesped.nombre_completo }}" class="rounded-circle border" style="width: 72px; height: 72px; object-fit: cover;">
+        {% else %}
+          <div class="rounded-circle text-white d-flex align-items-center justify-content-center fs-3 fw-bold" style="width: 72px; height: 72px; background-color: var(--primary-teal);">
+            {{ huesped.nombres|default:request.user.username|slice:":1"|upper }}
+          </div>
+        {% endif %}
+        <div>
+          <h3 class="section-title mb-1">{{ huesped.nombre_completo|default:request.user.username }}</h3>
+          <p class="text-muted mb-0 small">
+            Documento: {{ huesped.tipo_documento }} {{ huesped.numero_documento }} • Correo: {{ huesped.correo }}
+          </p>
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{% url 'editar_perfil_cliente' %}" class="btn btn-outline-teal">
+          <i class="bi bi-person-gear me-1"></i> Editar Perfil y Foto
+        </a>
+        <a href="{% url 'inicio_publico' %}" class="btn btn-teal">
+          <i class="bi bi-search me-1"></i> Buscar Alojamiento
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card-syshsena p-3 text-center">
+        <div class="text-muted small">Total Reservas</div>
+        <div class="fs-4 fw-bold section-title">{{ total_reservas }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-syshsena p-3 text-center">
+        <div class="text-muted small">Confirmadas</div>
+        <div class="fs-4 fw-bold text-success">{{ confirmadas_count }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-syshsena p-3 text-center">
+        <div class="text-muted small">Canceladas</div>
+        <div class="fs-4 fw-bold text-danger">{{ canceladas_count }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card-syshsena p-3 text-center">
+        <div class="text-muted small">Pendientes / Finalizadas</div>
+        <div class="fs-4 fw-bold" style="color: var(--primary-teal);">{{ pendientes_count }} / {{ finalizadas_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-syshsena p-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h5 class="section-title mb-0"><i class="bi bi-clock-history me-1"></i> Historial de Reservas</h5>
+      <div class="btn-group btn-group-sm flex-wrap" role="group">
+        <a href="{% url 'portal_cliente' %}?estado=TODAS" class="btn {% if estado_filtro == 'TODAS' %}btn-teal{% else %}btn-outline-secondary{% endif %}">Todas</a>
+        <a href="{% url 'portal_cliente' %}?estado=CONFIRMADA" class="btn {% if estado_filtro == 'CONFIRMADA' %}btn-success{% else %}btn-outline-success{% endif %}">Confirmadas</a>
+        <a href="{% url 'portal_cliente' %}?estado=CANCELADA" class="btn {% if estado_filtro == 'CANCELADA' %}btn-danger{% else %}btn-outline-danger{% endif %}">Canceladas</a>
+        <a href="{% url 'portal_cliente' %}?estado=PENDIENTE" class="btn {% if estado_filtro == 'PENDIENTE' %}btn-warning{% else %}btn-outline-warning text-dark{% endif %}">Pendientes</a>
+        <a href="{% url 'portal_cliente' %}?estado=FINALIZADA" class="btn {% if estado_filtro == 'FINALIZADA' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">Finalizadas</a>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Alojamiento</th>
+            <th>Habitación</th>
+            <th>Entrada - Salida</th>
+            <th>Noches</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th class="text-end">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in reservas %}
+            <tr>
+              <td class="fw-semibold">{{ r.codigo }}</td>
+              <td>
+                <a href="{% url 'detalle_alojamiento_publico' r.alojamiento.id %}" class="fw-semibold text-decoration-none">
+                  {{ r.alojamiento.nombre }}
+                </a>
+                <div class="small text-muted">{{ r.alojamiento.municipio.nombre }}</div>
+              </td>
+              <td>Hab. {{ r.habitacion.numero }} ({{ r.habitacion.tipo.nombre }})</td>
+              <td>{{ r.fecha_entrada|date:"d/m/Y" }} → {{ r.fecha_salida|date:"d/m/Y" }}</td>
+              <td>{{ r.noches }}</td>
+              <td class="fw-bold">${{ r.total_estimado|floatformat:0|intcomma }}</td>
+              <td>
+                {% if r.estado == 'CONFIRMADA' %}
+                  <span class="badge bg-success">Confirmada</span>
+                {% elif r.estado == 'CANCELADA' %}
+                  <span class="badge bg-danger">Cancelada</span>
+                {% elif r.estado == 'FINALIZADA' %}
+                  <span class="badge bg-secondary">Finalizada</span>
+                {% elif r.estado == 'EN_CURSO' %}
+                  <span class="badge bg-info text-dark">En Curso</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">Pendiente</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if r.estado in 'PENDIENTE,CONFIRMADA' %}
+                  <form method="post" action="{% url 'cancelar_reserva_cliente' r.id %}" class="d-inline" onsubmit="return confirm('¿Deseas cancelar esta reserva?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Cancelar</button>
+                  </form>
+                {% else %}
+                  <span class="text-muted small">Sin acciones</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-4">No tienes reservas registradas en este filtro.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

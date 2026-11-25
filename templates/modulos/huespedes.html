@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="section-title mb-0">Gestión de Huéspedes</h2>
+    <p class="text-muted small mb-0">Registro y trazabilidad de turistas y visitantes</p>
+  </div>
+  <button class="btn btn-teal" data-bs-toggle="modal" data-bs-target="#modalNuevoHuesped">+ Registrar Huésped</button>
+</div>
+
+<form method="get" class="card-syshsena p-3 mb-4">
+  <div class="input-group">
+    <input type="text" name="q" class="form-control" placeholder="Buscar huésped por nombre, documento o correo..." value="{{ q }}">
+    <button type="submit" class="btn btn-outline-teal">Buscar</button>
+  </div>
+</form>
+
+<div class="card-syshsena p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Documento</th>
+          <th>Nombre Completo</th>
+          <th>Teléfono</th>
+          <th>Correo</th>
+          <th>Nacionalidad</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in page_obj %}
+          <tr>
+            <td class="fw-semibold">{{ h.tipo_documento }} {{ h.numero_documento }}</td>
+            <td>{{ h.nombre_completo }}</td>
+            <td>{{ h.telefono }}</td>
+            <td>{{ h.correo }}</td>
+            <td>{{ h.nacionalidad }}</td>
+            <td class="text-end">
+              {% if h.origen == 'ALOJAMIENTO' %}
+                  <button class="btn btn-sm btn-outline-teal" data-bs-toggle="modal" data-bs-target="#modalEditHuesped{{ h.id }}">Editar</button>
+                {% else %}
+                  <span class="text-muted small">Registro portal</span>
+                {% endif %}
+            </td>
+          </tr>
+
+          <div class="modal fade" id="modalEditHuesped{{ h.id }}" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <form method="post" action="{% url 'editar_huesped' h.id %}">
+                  {% csrf_token %}
+                  <div class="modal-header">
+                    <h5 class="modal-title section-title">Editar Huésped</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label">Tipo Doc.</label>
+                      <select name="tipo_documento" class="form-select">
+                        {% for val, lbl in tipos_doc %}
+                          <option value="{{ val }}" {% if h.tipo_documento == val %}selected{% endif %}>{{ val }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label">Documento</label>
+                      <input type="text" name="numero_documento" class="form-control" value="{{ h.numero_documento }}" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Nombres</label>
+                      <input type="text" name="nombres" class="form-control" value="{{ h.nombres }}" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Apellidos</label>
+                      <input type="text" name="apellidos" class="form-control" value="{{ h.apellidos }}" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Teléfono</label>
+                      <input type="text" name="telefono" class="form-control" value="{{ h.telefono }}" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Nacionalidad</label>
+                      <input type="text" name="nacionalidad" class="form-control" value="{{ h.nacionalidad }}" required>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Correo</label>
+                      <input type="email" name="correo" class="form-control" value="{{ h.correo }}" required>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal">Guardar Cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <tr><td colspan="6" class="text-center py-4 text-muted">No hay huéspedes registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modalNuevoHuesped" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'crear_huesped' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Registrar Huésped</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Tipo Doc.</label>
+            <select name="tipo_documento" class="form-select">
+              {% for val, lbl in tipos_doc %}
+                <option value="{{ val }}">{{ val }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Número Documento</label>
+            <input type="text" name="numero_documento" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Nombres</label>
+            <input type="text" name="nombres" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Apellidos</label>
+            <input type="text" name="apellidos" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Teléfono</label>
+            <input type="text" name="telefono" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Nacionalidad</label>
+            <input type="text" name="nacionalidad" class="form-control" value="Colombiana" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Correo</label>
+            <input type="email" name="correo" class="form-control" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Contacto de emergencia</label>
+            <input type="text" name="contacto_emergencia" class="form-control" placeholder="Nombre y teléfono">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Guardar Huésped</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

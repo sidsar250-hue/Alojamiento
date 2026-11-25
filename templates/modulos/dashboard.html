@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h3 class="fw-bold mb-0">Panel de Control — SysHSENA</h3>
+      <small class="text-muted">Rol actual: <span class="badge bg-secondary">{{ rol|default:"Staff" }}</span></small>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'gestion_alojamientos' %}" class="btn btn-outline-primary btn-sm">Alojamientos</a>
+      <a href="{% url 'gestion_habitaciones' %}" class="btn btn-outline-primary btn-sm">Habitaciones</a>
+      <a href="{% url 'gestion_huespedes' %}" class="btn btn-outline-primary btn-sm">Huéspedes</a>
+      <a href="{% url 'gestion_reservas' %}" class="btn btn-primary btn-sm">Reservas</a>
+      <a href="{% url 'gestion_estadias_pagos' %}" class="btn btn-outline-success btn-sm">Estadías y Pagos</a>
+      <a href="{% url 'reportes_guajira' %}" class="btn btn-outline-dark btn-sm">Reportes</a>
+      <a href="{% url 'gestion_usuarios' %}" class="btn btn-outline-secondary btn-sm">Usuarios</a>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Alojamientos</div>
+          <div class="fs-3 fw-bold mt-1">{{ total_alojamientos }}</div>
+          <small class="text-muted">Registrados en La Guajira</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Habitaciones Disponibles</div>
+          <div class="fs-3 fw-bold text-success mt-1">{{ habitaciones_disponibles }} <span class="fs-6 text-muted fw-normal">/ {{ total_habitaciones }}</span></div>
+          <small class="text-muted">Listas para asignar</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Reservas Activas</div>
+          <div class="fs-3 fw-bold text-primary mt-1">{{ reservas_activas }}</div>
+          <small class="text-muted">Pendientes, confirmadas o en curso</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted small">Ingresos Registrados</div>
+          <div class="fs-4 fw-bold mt-1">${{ ingresos_registrados|floatformat:0|intcomma }}</div>
+          <small class="text-muted">Pagos confirmados</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0">Últimas Reservas</h5>
+        <a href="{% url 'gestion_reservas' %}" class="btn btn-sm btn-outline-secondary">Ver todas</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Código</th>
+              <th>Huésped</th>
+              <th>Alojamiento</th>
+              <th>Habitación</th>
+              <th>Fechas</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in ultimas_reservas %}
+              <tr>
+                <td class="fw-semibold">{{ r.codigo }}</td>
+                <td>{{ r.huesped.nombre_completo }}</td>
+                <td>{{ r.alojamiento.nombre }}</td>
+                <td>Hab. {{ r.habitacion.numero }}</td>
+                <td class="small">{{ r.fecha_entrada|date:"d/m/Y" }} → {{ r.fecha_salida|date:"d/m/Y" }}</td>
+                <td class="fw-semibold">${{ r.total_estimado|floatformat:0|intcomma }}</td>
+                <td><span class="badge bg-secondary">{{ r.estado }}</span></td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">Aún no hay reservas registradas.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

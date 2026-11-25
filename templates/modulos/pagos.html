@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="section-title mb-0">Gestión de Pagos y Abonos</h2>
+    <p class="text-muted small mb-0">Control de ingresos, saldos pendientes y métodos de pago</p>
+  </div>
+  {% if rol_actual == 'Administrador' or rol_actual == 'Recepcionista' %}
+  <button class="btn btn-teal" data-bs-toggle="modal" data-bs-target="#modalNuevoPago">+ Registrar Pago / Abono</button>
+  {% endif %}
+</div>
+
+<div class="card-syshsena p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Reserva</th>
+          <th>Huésped</th>
+          <th>Método</th>
+          <th>Tipo</th>
+          <th>Monto Pagado</th>
+          <th>Saldo Reserva</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in page_obj %}
+          <tr>
+            <td class="small">{{ p.fecha_pago|date:"d/m/Y H:i" }}</td>
+            <td class="fw-bold">{{ p.reserva.codigo }}</td>
+            <td>{{ p.reserva.huesped.nombre_completo }}</td>
+            <td>{{ p.get_metodo_pago_display }}</td>
+            <td><span class="badge badge-teal">{{ p.get_tipo_pago_display }}</span></td>
+            <td class="text-success fw-bold">${{ p.monto|floatformat:0|intcomma }}</td>
+            <td class="text-danger">${{ p.reserva.saldo_pendiente|floatformat:0|intcomma }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="text-center py-4 text-muted">No hay pagos registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modalNuevoPago" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'registrar_pago' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Registrar Pago o Abono</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <div class="col-12">
+            <label class="form-label">Reserva</label>
+            <select name="reserva" class="form-select" required>
+              <option value="" selected disabled>Seleccione una reserva...</option>
+              {% for r in reservas %}
+                <option value="{{ r.id }}">{{ r.codigo }} — {{ r.huesped.nombre_completo }} (Saldo: ${{ r.saldo_pendiente|floatformat:0 }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Monto a Pagar (COP)</label>
+            <input type="number" name="monto" step="0.01" min="1" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Método de Pago</label>
+            <select name="metodo_pago" class="form-select">
+              {% for val, lbl in metodos_pago %}
+                <option value="{{ val }}">{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Referencia / Comprobante</label>
+            <input type="text" name="referencia" class="form-control" placeholder="Opcional">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Guardar Pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends 'base_public.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<div class="container my-4">
+  <div class="card-syshsena p-4 mb-4">
+    <h2 class="section-title mb-1">Explora Alojamientos en La Guajira</h2>
+    <p class="text-muted small mb-3">Encuentra hoteles, hostales, cabañas y eco-hoteles en todo el departamento.</p>
+
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted mb-1">Municipio</label>
+        <select name="municipio" class="form-select">
+          <option value="">Todos los municipios</option>
+          {% for m in municipios %}
+            <option value="{{ m.id }}" {% if filtro_municipio == m.id|stringformat:"s" %}selected{% endif %}>{{ m.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted mb-1">Tipo de alojamiento</label>
+        <select name="tipo" class="form-select">
+          <option value="">Todos los tipos</option>
+          {% for t in tipos_alojamiento %}
+            <option value="{{ t }}" {% if filtro_tipo == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold text-muted mb-1">Palabra clave</label>
+        <input type="text" name="q" class="form-control" value="{{ filtro_q }}" placeholder="Ej: Riohacha, playa, cabaña...">
+      </div>
+
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-teal w-100"><i class="bi bi-search me-1"></i> Filtrar</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="row g-4">
+    {% for aloj in alojamientos %}
+      <div class="col-md-6 col-lg-4">
+        <div class="card-syshsena h-100 d-flex flex-column overflow-hidden">
+          {% with primera_img=aloj.imagenes.first %}
+            {% if primera_img %}
+              <img src="{{ primera_img.imagen.url }}" class="w-100" style="height: 200px; object-fit: cover;" alt="{{ aloj.nombre }}">
+            {% else %}
+              <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=900&q=80" class="w-100" style="height: 200px; object-fit: cover;" alt="{{ aloj.nombre }}">
+            {% endif %}
+          {% endwith %}
+
+          <div class="p-3 d-flex flex-column flex-grow-1 justify-content-between">
+            <div>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="badge badge-teal">{{ aloj.tipo }}</span>
+                {% if aloj.promedio_estrellas %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-star-fill"></i> {{ aloj.promedio_estrellas }}</span>
+                {% else %}
+                  <span class="small text-muted">{{ aloj.estrellas }} ★</span>
+                {% endif %}
+              </div>
+              <h5 class="section-title mb-1">{{ aloj.nombre }}</h5>
+              <p class="small text-muted mb-2"><i class="bi bi-geo-alt-fill text-danger"></i> {{ aloj.municipio.nombre }}</p>
+              <p class="small text-secondary">{{ aloj.descripcion|truncatechars:110 }}</p>
+            </div>
+
+            <div class="pt-2 border-top d-flex justify-content-between align-items-center">
+              <span class="small fw-semibold text-muted">{{ aloj.habitaciones.count }} hab.</span>
+              <a href="{% url 'detalle_alojamiento_publico' aloj.id %}" class="btn btn-teal btn-sm">Ver Detalles</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-12">
+        <div class="alert alert-info">No se encontraron alojamientos con esos filtros.</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

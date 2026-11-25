@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h2 class="section-title mb-0">Servicios Adicionales y Tours</h2>
+    <p class="text-muted small mb-0">Catálogo de servicios turísticos y consumos asociados a reservas</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if rol_actual == 'Administrador' %}
+      <button class="btn btn-outline-teal" data-bs-toggle="modal" data-bs-target="#modalNuevoServicio">+ Nuevo Servicio</button>
+    {% endif %}
+    <button class="btn btn-teal" data-bs-toggle="modal" data-bs-target="#modalAsociarServicio">+ Asociar a Reserva</button>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="card-syshsena p-3">
+      <h5 class="section-title mb-3">Catálogo de Servicios</h5>
+      {% for s in servicios %}
+        <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+          <div>
+            <div class="fw-semibold">{{ s.nombre }}</div>
+            <small class="text-muted">{{ s.descripcion }}</small>
+          </div>
+          <span class="badge badge-teal fs-6">${{ s.precio|floatformat:0|intcomma }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card-syshsena p-3">
+      <h5 class="section-title mb-3">Últimos Servicios Asociados a Reservas</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Reserva</th>
+              <th>Servicio</th>
+              <th>Cant.</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in consumos %}
+              <tr>
+                <td class="fw-bold">{{ c.reserva.codigo }}</td>
+                <td>{{ c.servicio.nombre }}</td>
+                <td>{{ c.cantidad }}</td>
+                <td class="fw-semibold">${{ c.subtotal|floatformat:0|intcomma }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-center py-3 text-muted">Aún no se han asociado servicios a reservas.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo Servicio -->
+<div class="modal fade" id="modalNuevoServicio" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'crear_servicio' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Crear Servicio Adicional</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nombre del Servicio</label>
+            <input type="text" name="nombre" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Precio (COP)</label>
+            <input type="number" name="precio" class="form-control" required>
+          </div>
+          <div>
+            <label class="form-label">Descripción</label>
+            <textarea name="descripcion" rows="2" class="form-control"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Asociar Servicio a Reserva -->
+<div class="modal fade" id="modalAsociarServicio" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'asociar_servicio_reserva' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Asociar Servicio a Reserva</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <div class="col-12">
+            <label class="form-label">Reserva Activa</label>
+            <select name="reserva" class="form-select" required>
+              {% for r in reservas %}
+                <option value="{{ r.id }}">{{ r.codigo }} — {{ r.huesped.nombre_completo }} (Hab. {{ r.habitacion.numero }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Servicio</label>
+            <select name="servicio" class="form-select" required>
+              {% for s in servicios %}
+                <option value="{{ s.id }}">{{ s.nombre }} (${{ s.precio|floatformat:0 }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Cantidad</label>
+            <input type="number" name="cantidad" min="1" value="1" class="form-control" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Asociar Servicio</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

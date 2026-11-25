@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h2 class="section-title mb-0">Gestión de Habitaciones</h2>
+    <p class="text-muted small mb-0">Inventario, tarifas por noche, capacidad y estados operativos</p>
+  </div>
+  {% if rol_actual == 'Administrador' %}
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-teal" data-bs-toggle="modal" data-bs-target="#modalTipoHab">+ Tipo de Habitación</button>
+    <button class="btn btn-teal" data-bs-toggle="modal" data-bs-target="#modalNuevaHab">+ Añadir Habitación</button>
+  </div>
+  {% endif %}
+</div>
+
+<form method="get" class="card-syshsena p-3 mb-4">
+  <div class="row g-2">
+    <div class="col-md-4">
+      <input type="text" name="q" class="form-control" placeholder="Buscar por número o tipo..." value="{{ filtros.q }}">
+    </div>
+    <div class="col-md-3">
+      <select name="alojamiento" class="form-select">
+        <option value="">Todos los alojamientos</option>
+        {% for a in alojamientos %}
+          <option value="{{ a.id }}" {% if filtros.alojamiento == a.id|stringformat:"s" %}selected{% endif %}>{{ a.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="estado" class="form-select">
+        <option value="">Todos los estados</option>
+        {% for val, lbl in estados %}
+          <option value="{{ val }}" {% if filtros.estado == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button type="submit" class="btn btn-outline-teal w-100">Filtrar</button>
+    </div>
+  </div>
+</form>
+
+<div class="card-syshsena p-3">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Hab.</th>
+          <th>Establecimiento</th>
+          <th>Tipo</th>
+          <th>Piso / Capacidad</th>
+          <th>Precio / Noche</th>
+          <th>Estado</th>
+          {% if rol_actual == 'Administrador' %}<th class="text-end">Acciones</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in page_obj %}
+          <tr>
+            <td class="fw-bold">#{{ h.numero }}</td>
+            <td>{{ h.alojamiento.nombre }}</td>
+            <td>{{ h.tipo.nombre }}</td>
+            <td>Piso {{ h.piso }} • {{ h.capacidad }} pers.</td>
+            <td class="fw-semibold">${{ h.precio_noche|floatformat:0|intcomma }}</td>
+            <td>
+              {% if h.estado == 'DISPONIBLE' %}
+                <span class="badge bg-success">Disponible</span>
+              {% elif h.estado == 'OCUPADA' %}
+                <span class="badge bg-danger">Ocupada</span>
+              {% else %}
+                <span class="badge bg-warning text-dark">{{ h.get_estado_display }}</span>
+              {% endif %}
+            </td>
+            {% if rol_actual == 'Administrador' %}
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-teal" data-bs-toggle="modal" data-bs-target="#modalEditHab{{ h.id }}">Editar</button>
+            </td>
+            {% endif %}
+          </tr>
+
+          <!-- Modal Editar Habitación -->
+          <div class="modal fade" id="modalEditHab{{ h.id }}" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <form method="post" action="{% url 'editar_habitacion' h.id %}" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  <div class="modal-header">
+                    <h5 class="modal-title section-title">Editar Habitación #{{ h.numero }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">Alojamiento</label>
+                      <select name="alojamiento" class="form-select">
+                        {% for a in alojamientos %}
+                          <option value="{{ a.id }}" {% if h.alojamiento_id == a.id %}selected{% endif %}>{{ a.nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Tipo</label>
+                      <select name="tipo" class="form-select">
+                        {% for t in tipos %}
+                          <option value="{{ t.id }}" {% if h.tipo_id == t.id %}selected{% endif %}>{{ t.nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Número</label>
+                      <input type="text" name="numero" class="form-control" value="{{ h.numero }}" required>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Piso</label>
+                      <input type="number" name="piso" class="form-control" value="{{ h.piso }}" required>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Capacidad</label>
+                      <input type="number" name="capacidad" class="form-control" value="{{ h.capacidad }}" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Precio Noche (COP)</label>
+                      <input type="number" name="precio_noche" class="form-control" value="{{ h.precio_noche|floatformat:0 }}" required>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Estado</label>
+                      <select name="estado" class="form-select">
+                        {% for val, lbl in estados %}
+                          <option value="{{ val }}" {% if h.estado == val %}selected{% endif %}>{{ lbl }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Imagen</label>
+                      <input type="file" name="imagen" accept="image/*" class="form-control">
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="submit" class="btn btn-teal">Guardar Cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        {% empty %}
+          <tr><td colspan="7" class="text-center py-4 text-muted">No hay habitaciones registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Nueva Habitación -->
+<div class="modal fade" id="modalNuevaHab" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'crear_habitacion' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Registrar Habitación</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Alojamiento</label>
+            <select name="alojamiento" class="form-select" required>
+              {% for a in alojamientos %}
+                <option value="{{ a.id }}">{{ a.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Tipo de Habitación</label>
+            <select name="tipo" class="form-select" required>
+              {% for t in tipos %}
+                <option value="{{ t.id }}">{{ t.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Número</label>
+            <input type="text" name="numero" class="form-control" placeholder="101" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Piso</label>
+            <input type="number" name="piso" class="form-control" value="1" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Capacidad</label>
+            <input type="number" name="capacidad" class="form-control" value="2" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Precio Noche (COP)</label>
+            <input type="number" name="precio_noche" class="form-control" placeholder="150000" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Estado inicial</label>
+            <select name="estado" class="form-select">
+              {% for val, lbl in estados %}
+                <option value="{{ val }}">{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Descripción</label>
+            <textarea name="descripcion" rows="2" class="form-control"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Fotografía de habitación</label>
+            <input type="file" name="imagen" accept="image/*" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Guardar Habitación</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo Tipo -->
+<div class="modal fade" id="modalTipoHab" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'crear_tipo_habitacion' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title section-title">Nuevo Tipo de Habitación</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nombre del Tipo</label>
+            <input type="text" name="nombre" class="form-control" placeholder="Ej: Suite Presidencial" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Capacidad Sugerida</label>
+            <input type="number" name="capacidad_sugerida" class="form-control" value="2" required>
+          </div>
+          <div>
+            <label class="form-label">Descripción</label>
+            <textarea name="descripcion" rows="2" class="form-control"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-teal">Crear Tipo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

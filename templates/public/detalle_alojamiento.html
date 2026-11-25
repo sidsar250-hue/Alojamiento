@@ -1,0 +1,288 @@
+{% extends 'base_public.html' %}
+{% load static %}
+{% load humanize %}
+{% block content %}
+<div class="container my-4" id="detalleAlojamientoContainer" data-fechas-ocupadas='{{ fechas_ocupadas_json|escapejs }}'>
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{% url 'inicio_publico' %}">Inicio</a></li>
+      <li class="breadcrumb-item">{{ alojamiento.municipio.nombre }}</li>
+      <li class="breadcrumb-item active">{{ alojamiento.nombre }}</li>
+    </ol>
+  </nav>
+
+  <div class="card-syshsena p-4 mb-4">
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div id="carouselAlojamiento" class="carousel slide rounded-3 overflow-hidden shadow-sm" data-bs-ride="carousel">
+          <div class="carousel-inner">
+            {% for img in alojamiento.imagenes.all %}
+              <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                <img src="{{ img.imagen.url }}" class="d-block w-100" style="height: 360px; object-fit: cover;" alt="{{ alojamiento.nombre }}">
+              </div>
+            {% empty %}
+              <div class="carousel-item active">
+                <img src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=1000&q=80" class="d-block w-100" style="height: 360px; object-fit: cover;" alt="{{ alojamiento.nombre }}">
+              </div>
+            {% endfor %}
+          </div>
+          {% if alojamiento.imagenes.count > 1 %}
+            <button class="carousel-control-prev" type="button" data-bs-target="#carouselAlojamiento" data-bs-slide="prev">
+              <span class="carousel-control-prev-icon"></span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#carouselAlojamiento" data-bs-slide="next">
+              <span class="carousel-control-next-icon"></span>
+            </button>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-lg-5 d-flex flex-column justify-content-between">
+        <div>
+          <span class="badge badge-teal mb-2">{{ alojamiento.tipo }} • {{ alojamiento.estrellas }} Estrellas</span>
+          {% if alojamiento.promedio_estrellas %}
+            <span class="badge bg-warning text-dark mb-2 ms-1">
+              <i class="bi bi-star-fill"></i> {{ alojamiento.promedio_estrellas }} / 5 ({{ resenas.count }} reseña{{ resenas.count|pluralize }})
+            </span>
+          {% endif %}
+          <h2 class="section-title">{{ alojamiento.nombre }}</h2>
+          <p class="text-muted"><i class="bi bi-geo-alt-fill text-danger"></i> {{ alojamiento.direccion }}, {{ alojamiento.municipio.nombre }} (La Guajira)</p>
+          <p>{{ alojamiento.descripcion }}</p>
+          <h6 class="fw-bold section-title mt-3">Servicios del establecimiento</h6>
+          <div class="d-flex flex-wrap gap-1 mb-3">
+            {% for serv in alojamiento.lista_servicios_incluidos %}
+              <span class="badge bg-light text-dark border"><i class="bi bi-check2-circle text-success me-1"></i>{{ serv }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="p-3 rounded-3 bg-white border small">
+          <div><strong>Teléfono:</strong> {{ alojamiento.telefono }}</div>
+          <div><strong>Correo:</strong> {{ alojamiento.correo }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-syshsena p-3 mb-4">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label small fw-semibold">Selecciona Entrada y Salida en el Calendario</label>
+        <input type="text" id="rangoFechasFiltro" class="form-control bg-white" placeholder="Haz clic para elegir fechas en el calendario" readonly required>
+        <input type="hidden" name="fecha_entrada" value="{{ fecha_entrada }}">
+        <input type="hidden" name="fecha_salida" value="{{ fecha_salida }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold">Huéspedes</label>
+        <input type="number" name="huespedes" min="1" max="12" class="form-control" value="{{ huespedes_req }}">
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-teal w-100"><i class="bi bi-calendar-check me-1"></i> Verificar Disponibilidad</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <h4 class="section-title mb-3">Habitaciones Disponibles</h4>
+      {% for item in habitaciones_info %}
+        {% with hab=item.obj %}
+        <div class="card-syshsena p-3 mb-3">
+          <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+              {% if hab.imagen %}
+                <img src="{{ hab.imagen.url }}" class="img-fluid rounded-3" style="height: 145px; width: 100%; object-fit: cover;">
+              {% else %}
+                <img src="https://images.unsplash.com/photo-1611892440504-42a792e24d32?auto=format&fit=crop&w=600&q=80" class="img-fluid rounded-3" style="height: 145px; width: 100%; object-fit: cover;">
+              {% endif %}
+            </div>
+            <div class="col-md-5">
+              <span class="badge bg-secondary mb-1">Piso {{ hab.piso }} • Hab. {{ hab.numero }}</span>
+              <h5 class="section-title mb-1">{{ hab.tipo.nombre }}</h5>
+              <p class="small text-muted mb-1"><i class="bi bi-people-fill"></i> Capacidad máxima: {{ hab.capacidad }} persona(s)</p>
+              <p class="small mb-0">{{ hab.descripcion|default:"Equipada con baño privado, aire acondicionado y ropa de cama." }}</p>
+            </div>
+            <div class="col-md-3 text-md-end">
+              {% if noches_seleccionadas > 0 %}
+                <div class="fs-5 fw-bold" style="color: var(--primary-teal);">
+                  ${{ item.total_estadia|floatformat:0|intcomma }}
+                </div>
+                <small class="text-muted d-block mb-2">
+                  total por {{ noches_seleccionadas }} noche(s) (${{ hab.precio_noche|floatformat:0|intcomma }}/n)
+                </small>
+              {% else %}
+                <div class="fs-5 fw-bold" style="color: var(--primary-teal);">
+                  ${{ hab.precio_noche|floatformat:0|intcomma }}
+                </div>
+                <small class="text-muted d-block mb-2">por noche</small>
+              {% endif %}
+
+              {% if item.disponible_fechas %}
+                {% if request.user.is_authenticated %}
+                  <button class="btn btn-teal btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modalReservar{{ hab.id }}">Reservar Ahora</button>
+                {% else %}
+                  <a href="{% url 'login' %}" class="btn btn-outline-teal btn-sm w-100">Inicia sesión para reservar</a>
+                {% endif %}
+              {% else %}
+                <span class="badge bg-danger w-100 py-2">No disponible</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="modal fade" id="modalReservar{{ hab.id }}" tabindex="-1" data-precio-noche="{{ hab.precio_noche }}">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <form method="post" action="{% url 'reservar_cliente' hab.id %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                  <h5 class="modal-title section-title">Reservar Habitación {{ hab.numero }} ({{ hab.tipo.nombre }})</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body row g-3">
+                  <div class="col-12">
+                    <label class="form-label">Selecciona Fechas en el Calendario</label>
+                    <input type="text" class="form-control bg-white rango-fechas-modal" placeholder="Elige entrada y salida" readonly required>
+                    <input type="hidden" name="fecha_entrada" value="{{ fecha_entrada }}">
+                    <input type="hidden" name="fecha_salida" value="{{ fecha_salida }}">
+                  </div>
+                  <div class="col-12">
+                    <div class="resumen-precio-modal small fw-semibold"></div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Número de Huéspedes (Máx. {{ hab.capacidad }})</label>
+                    <input type="number" name="numero_huespedes" min="1" max="{{ hab.capacidad }}" value="{{ huespedes_req }}" class="form-control" required>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Observaciones o requerimientos especiales</label>
+                    <textarea name="observaciones" rows="2" class="form-control" placeholder="Ej: Llegada en horas de la tarde..."></textarea>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                  <button type="submit" class="btn btn-teal">Confirmar Reserva</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+      {% empty %}
+        <div class="alert alert-info">No hay habitaciones registradas para los criterios seleccionados.</div>
+      {% endfor %}
+
+      <div class="card-syshsena p-4 mt-4" id="seccionResenas">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <h4 class="section-title mb-0"><i class="bi bi-star-half text-warning me-1"></i> Reseñas de Huéspedes</h4>
+          {% if alojamiento.promedio_estrellas %}
+            <span class="badge bg-warning text-dark fs-6">
+              {{ alojamiento.promedio_estrellas }} ★ ({{ resenas.count }})
+            </span>
+          {% endif %}
+        </div>
+
+        {% if request.user.is_authenticated %}
+          <form method="post" action="{% url 'crear_resena_alojamiento' alojamiento.id %}" class="p-3 rounded-3 bg-white border mb-4">
+            {% csrf_token %}
+            <h6 class="fw-bold mb-2">
+              {% if resena_usuario %}Actualizar tu reseña{% else %}Deja tu reseña y calificación{% endif %}
+            </h6>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold d-block">Estrellas (1 a 5)</label>
+              <div class="d-flex gap-2 flex-wrap">
+                {% for n in "12345" %}
+                  {% with val=forloop.counter %}
+                  <label class="btn btn-outline-warning btn-sm text-dark">
+                    <input type="radio" name="estrellas" value="{{ val }}" {% if resena_usuario and resena_usuario.estrellas == val %}checked{% elif not resena_usuario and val == 5 %}checked{% endif %} required>
+                    {{ val }} ★
+                  </label>
+                  {% endwith %}
+                {% endfor %}
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label small fw-semibold">Comentario</label>
+              <textarea name="comentario" rows="3" class="form-control" placeholder="Cuéntanos cómo fue tu experiencia en {{ alojamiento.nombre }}..." required>{% if resena_usuario %}{{ resena_usuario.comentario }}{% endif %}</textarea>
+            </div>
+            <button type="submit" class="btn btn-teal btn-sm">
+              <i class="bi bi-send me-1"></i> {% if resena_usuario %}Guardar Cambios{% else %}Publicar Reseña{% endif %}
+            </button>
+          </form>
+        {% else %}
+          <div class="alert alert-light border d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+            <span class="small mb-0">Inicia sesión con tu cuenta para dejar una reseña y calificar con estrellas.</span>
+            <a href="{% url 'login' %}" class="btn btn-outline-teal btn-sm">Iniciar sesión</a>
+          </div>
+        {% endif %}
+
+        {% for r in resenas %}
+          <div class="border-bottom pb-3 mb-3">
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="d-flex align-items-center gap-2">
+                {% if r.usuario.huesped and r.usuario.huesped.foto_perfil %}
+                  <img src="{{ r.usuario.huesped.foto_perfil.url }}" alt="{{ r.usuario.username }}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;">
+                {% else %}
+                  <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px;">
+                    {{ r.usuario.first_name|default:r.usuario.username|slice:":1"|upper }}
+                  </div>
+                {% endif %}
+                <div>
+                  <strong class="small d-block">{{ r.usuario.get_full_name|default:r.usuario.username }}</strong>
+                  <small class="text-muted">{{ r.creado_en|date:"d/m/Y" }}</small>
+                </div>
+              </div>
+              <span class="badge bg-warning text-dark">
+                {% for _ in "x"|rjust:r.estrellas %}★{% endfor %} ({{ r.estrellas }}/5)
+              </span>
+            </div>
+            <p class="small mt-2 mb-0">{{ r.comentario }}</p>
+          </div>
+        {% empty %}
+          <p class="text-muted small mb-0">Aún no hay reseñas para este alojamiento. ¡Sé el primero en opinar!</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card-syshsena p-3 mb-3">
+        <h5 class="section-title mb-2"><i class="bi bi-map me-1"></i> Ubicación en Google Maps</h5>
+        <div id="map-detalle"></div>
+        <small class="text-muted d-block mt-2">Coordenadas: {{ alojamiento.latitud }}, {{ alojamiento.longitud }}</small>
+      </div>
+
+      {% if sitios_cercanos %}
+      <div class="card-syshsena p-3">
+        <h6 class="section-title mb-2">Sitios turísticos en {{ alojamiento.municipio.nombre }}</h6>
+        {% for s in sitios_cercanos %}
+          <div class="border-bottom pb-2 mb-2">
+            <strong class="small d-block">{{ s.nombre }}</strong>
+            <span class="small text-muted">{{ s.descripcion }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    const latDet = parseFloat("{{ alojamiento.latitud }}".replace(",", "."));
+    const lngDet = parseFloat("{{ alojamiento.longitud }}".replace(",", "."));
+    function initMapDetalle() {
+      const pos = { lat: latDet, lng: lngDet };
+      const map = new google.maps.Map(document.getElementById("map-detalle"), { zoom: 14, center: pos });
+      new google.maps.Marker({ position: pos, map: map, title: "{{ alojamiento.nombre }}" });
+    }
+  </script>
+  {% if GOOGLE_MAPS_API_KEY %}
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key={{ GOOGLE_MAPS_API_KEY }}&callback=initMapDetalle"></script>
+  {% else %}
+    <script>
+      document.getElementById("map-detalle").innerHTML = `
+        <iframe width="100%" height="100%" frameborder="0" style="border:0; border-radius:12px;"
+          src="https://maps.google.com/maps?q=${latDet},${lngDet}&z=14&output=embed"></iframe>`;
+    </script>
+  {% endif %}
+{% endblock %}
