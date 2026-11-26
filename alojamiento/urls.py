@@ -22,6 +22,8 @@ urlpatterns = [
     path('panel/', views.dashboard, name='dashboard'),
     path('panel/usuarios/', views.gestion_usuarios, name='gestion_usuarios'),
     path('panel/usuarios/crear/', views.crear_usuario_panel, name='crear_usuario'),
+    path('panel/usuarios/<int:perfil_id>/editar/', views.editar_usuario_panel, name='editar_usuario'),
+    path('panel/usuarios/<int:perfil_id>/toggle/', views.toggle_usuario_panel, name='toggle_usuario'),
 
     path('panel/alojamientos/', views.gestion_alojamientos, name='gestion_alojamientos'),
     path('panel/alojamiento/', views.gestion_alojamientos, name='gestion_alojamiento'),
@@ -54,6 +56,8 @@ urlpatterns = [
     path('panel/pagos/registrar/', views.registrar_pago, name='registrar_pago'),
 
     path('panel/servicios/', views.gestion_servicios, name='gestion_servicios'),
+    path('panel/servicios/crear/', views.crear_servicio_panel, name='crear_servicio'),
+    path('panel/servicios/asociar/', views.asociar_servicio_reserva, name='asociar_servicio_reserva'),
 
     path('panel/reportes/', views.reportes_guajira, name='reportes_guajira'),
     path('panel/reportes/alias/', views.reportes_guajira, name='gestion_reportes'),

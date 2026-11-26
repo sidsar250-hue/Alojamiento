@@ -140,8 +140,8 @@
                 </div>
                 <div class="modal-body row g-3">
                   <div class="col-12">
-                    <label class="form-label">Selecciona Fechas en el Calendario</label>
-                    <input type="text" class="form-control bg-white rango-fechas-modal" placeholder="Elige entrada y salida" readonly required>
+                    <label class="form-label">Fechas de Estadía (Entrada y Salida)</label>
+                    <input type="text" class="form-control bg-light rango-fechas-modal" placeholder="Selecciona fechas en el calendario superior" readonly tabindex="-1" style="pointer-events: none;">
                     <input type="hidden" name="fecha_entrada" value="{{ fecha_entrada }}">
                     <input type="hidden" name="fecha_salida" value="{{ fecha_salida }}">
                   </div>
@@ -159,7 +159,7 @@
                 </div>
                 <div class="modal-footer">
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                  <button type="submit" class="btn btn-teal">Confirmar Reserva</button>
+                  <button type="submit" class="btn btn-teal btn-confirmar-reserva">Confirmar Reserva</button>
                 </div>
               </form>
             </div>

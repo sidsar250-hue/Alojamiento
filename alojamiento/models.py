@@ -21,6 +21,8 @@ class PerfilUsuario(models.Model):
     rol = models.ForeignKey(Rol, on_delete=models.PROTECT, related_name='usuarios')
     telefono = models.CharField(max_length=25, blank=True)
     activo = models.BooleanField(default=True)
+    tipo_documento = models.CharField(max_length=10, blank=True, default='CC')
+    documento = models.CharField(max_length=30, blank=True, default='')
 
     class Meta:
         verbose_name = 'Perfil de Usuario'

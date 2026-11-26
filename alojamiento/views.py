@@ -559,86 +559,6 @@ def dashboard(request):
     })
 
 
-@login_required
-def gestion_usuarios(request):
-    if not tiene_rol(request.user, ['Administrador']):
-        messages.error(request, 'Solo el Administrador puede gestionar usuarios y roles.')
-        return redirect('dashboard')
-
-    roles = Rol.objects.all()
-    usuarios = User.objects.select_related('perfil', 'perfil__rol').order_by('id')
-
-    if request.method == 'POST':
-        accion = request.POST.get('accion', 'crear')
-        if accion == 'crear':
-            username = request.POST.get('username', '').strip()
-            email = request.POST.get('email', '').strip()
-            first_name = request.POST.get('first_name', '').strip()
-            last_name = request.POST.get('last_name', '').strip()
-            telefono = request.POST.get('telefono', '').strip()
-            password = request.POST.get('password', '').strip()
-            rol_id = request.POST.get('rol_id', '').strip()
-
-            if not username or not password or not rol_id:
-                messages.error(request, 'Usuario, contraseña y rol son obligatorios.')
-                return redirect('gestion_usuarios')
-
-            if User.objects.filter(username__iexact=username).exists():
-                messages.error(request, 'Ese nombre de usuario ya existe.')
-                return redirect('gestion_usuarios')
-
-            rol_obj = get_object_or_404(Rol, id=int(rol_id))
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name,
-            )
-            PerfilUsuario.objects.create(
-                usuario=user,
-                rol=rol_obj,
-                telefono=telefono,
-                activo=True,
-            )
-            messages.success(request, f'Usuario {username} creado con rol {rol_obj.nombre}.')
-            return redirect('gestion_usuarios')
-
-        elif accion == 'editar':
-            user_id = request.POST.get('user_id')
-            usuario_edit = get_object_or_404(User, id=int(user_id))
-            usuario_edit.first_name = request.POST.get('first_name', '').strip()
-            usuario_edit.last_name = request.POST.get('last_name', '').strip()
-            usuario_edit.email = request.POST.get('email', '').strip()
-            activo = request.POST.get('activo') == 'on'
-            usuario_edit.is_active = activo
-            usuario_edit.save()
-
-            rol_id = request.POST.get('rol_id')
-            telefono = request.POST.get('telefono', '').strip()
-            rol_obj = get_object_or_404(Rol, id=int(rol_id))
-            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=usuario_edit, defaults={'rol': rol_obj})
-            perfil.rol = rol_obj
-            perfil.telefono = telefono
-            perfil.activo = activo
-            perfil.save()
-
-            messages.success(request, f'Usuario {usuario_edit.username} actualizado.')
-            return redirect('gestion_usuarios')
-
-    return render(request, 'modulos/usuarios.html', {
-        'rol_actual': obtener_rol_usuario(request.user),
-        'active_menu': 'usuarios',
-        'rol_actual': obtener_rol_usuario(request.user),
-        'active_menu': 'usuarios',
-        'usuarios': usuarios,
-        'roles': roles,
-    })
-
-
-
-
-
 
 @login_required
 def gestion_estadias_pagos(request):
@@ -805,25 +725,7 @@ def gestion_pagos(request):
     })
 
 
-@login_required
-def gestion_servicios(request):
-    if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
-        messages.error(request, 'No tienes permiso para acceder a Servicios.')
-        return redirect('dashboard')
-    if request.method == 'POST':
-        post_data = request.POST.copy()
-        post_data['accion'] = 'servicio'
-        request.POST = post_data
-        gestion_estadias_pagos(request)
-        return redirect('gestion_servicios')
-    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').prefetch_related('servicios_adicionales')
-    servicios = ServicioAdicional.objects.select_related('reserva', 'reserva__huesped', 'reserva__alojamiento').all()
-    return render(request, 'modulos/servicios.html', {
-        'rol_actual': obtener_rol_usuario(request.user),
-        'active_menu': 'servicios',
-        'reservas': reservas,
-        'servicios': servicios,
-    })
+
 @login_required
 def gestion_alojamientos(request):
     if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Gerente']):
@@ -1378,18 +1280,283 @@ def registrar_pago(request):
             )
             messages.success(request, f'Pago de ${monto:,.0f} registrado en {reserva.codigo}.')
     return redirect('gestion_pagos')
+@login_required
+def crear_servicio_panel(request):
+    if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento']):
+        messages.error(request, 'No tienes permiso para crear servicios.')
+        return redirect('gestion_servicios')
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre', '').strip()
+        precio = Decimal(request.POST.get('precio', '0').replace(',', '.') or '0')
+        descripcion = request.POST.get('descripcion', '').strip()
+        if nombre and precio >= 0:
+            # Si tu modelo ServicioAdicional es de catálogo o asociado a reserva, lo creamos de forma segura
+            fields = {f.name for f in ServicioAdicional._meta.fields}
+            if 'reserva' in fields:
+                reserva = Reserva.objects.first()
+                if reserva:
+                    ServicioAdicional.objects.create(
+                        reserva=reserva,
+                        nombre=nombre,
+                        cantidad=1,
+                        precio_unitario=precio,
+                        subtotal=precio,
+                    )
+            else:
+                ServicioAdicional.objects.create(
+                    nombre=nombre,
+                    precio=precio,
+                    descripcion=descripcion,
+                )
+            messages.success(request, f'Servicio "{nombre}" guardado.')
+    return redirect('gestion_servicios')
 
+
+@login_required
+def asociar_servicio_reserva(request):
+    if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
+        messages.error(request, 'No tienes permiso para asociar servicios.')
+        return redirect('gestion_servicios')
+    if request.method == 'POST':
+        reserva_id = request.POST.get('reserva') or request.POST.get('reserva_id')
+        reserva = get_object_or_404(Reserva, id=int(reserva_id))
+        servicio_id = request.POST.get('servicio')
+        cantidad = int(request.POST.get('cantidad', '1') or 1)
+        if servicio_id and servicio_id.isdigit():
+            serv_cat = ServicioAdicional.objects.filter(id=int(servicio_id)).first()
+            nombre_serv = serv_cat.nombre if serv_cat else 'Servicio adicional'
+            precio_u = getattr(serv_cat, 'precio', getattr(serv_cat, 'precio_unitario', Decimal('0')))
+        else:
+            nombre_serv = request.POST.get('nombre_servicio', 'Servicio adicional').strip()
+            precio_u = Decimal(request.POST.get('precio_unitario', '0').replace(',', '.') or '0')
+        subtotal = Decimal(cantidad) * Decimal(precio_u)
+        ServicioAdicional.objects.create(
+            reserva=reserva,
+            nombre=nombre_serv,
+            cantidad=cantidad,
+            precio_unitario=precio_u,
+            subtotal=subtotal,
+        )
+        reserva.total_estimado = (reserva.total_estimado or Decimal('0')) + subtotal
+        reserva.save(update_fields=['total_estimado', 'actualizado_en'])
+        messages.success(request, f'Servicio "{nombre_serv}" asociado a {reserva.codigo}.')
+    return redirect('gestion_servicios')
+
+class _ConsumoVista:
+    def __init__(self, consumo):
+        self._consumo = consumo
+        self.id = consumo.id
+        self.reserva = consumo.reserva
+        self.cantidad = getattr(consumo, 'cantidad', 1)
+        self.subtotal = getattr(consumo, 'subtotal', getattr(consumo, 'precio_unitario', 0))
+
+        serv_attr = getattr(consumo, 'servicio', None)
+        nombre_texto = (
+            getattr(consumo, 'nombre', None)
+            or getattr(consumo, 'nombre_servicio', None)
+            or (serv_attr.nombre if hasattr(serv_attr, 'nombre') else (serv_attr if isinstance(serv_attr, str) else ''))
+            or 'Servicio adicional'
+        )
+
+        if hasattr(serv_attr, 'nombre'):
+            self.servicio = serv_attr
+        else:
+            self.servicio = type('ServicioObj', (), {'nombre': nombre_texto})()
+
+        self.nombre = nombre_texto
+
+    def __getattr__(self, name):
+        return getattr(self._consumo, name)
 
 @login_required
 def gestion_servicios(request):
     if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
         messages.error(request, 'No tienes permiso para acceder a Servicios.')
         return redirect('dashboard')
-    servicios = ServicioAdicional.objects.select_related('reserva', 'reserva__huesped').all()
-    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').all()
+    consumos_qs = ServicioAdicional.objects.select_related('reserva', 'reserva__huesped').order_by('-id')
+    consumos = [_ConsumoVista(c) for c in consumos_qs]
+    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').order_by('-id')
     return render(request, 'modulos/servicios.html', {
         'rol_actual': obtener_rol_usuario(request.user),
         'active_menu': 'servicios',
-        'servicios': servicios,
+        'servicios': consumos,
+        'consumos': consumos,
         'reservas': reservas,
     })
+
+
+class _PerfilVista:
+    def __init__(self, perfil):
+        self._perfil = perfil
+        self.id = perfil.id
+        self.user = perfil.usuario
+        self.usuario = perfil.usuario
+        self.rol = perfil.rol
+        self.telefono = getattr(perfil, 'telefono', '')
+        self.activo = getattr(perfil, 'activo', perfil.usuario.is_active)
+        self.foto_perfil = getattr(perfil, 'foto_perfil', None)
+        
+        huesped_rel = getattr(perfil.usuario, 'huesped', None)
+        self.tipo_documento = (
+            getattr(perfil, 'tipo_documento', '')
+            or (getattr(huesped_rel, 'tipo_documento', '') if huesped_rel else '')
+        )
+        self.documento = (
+            getattr(perfil, 'documento', '')
+            or (getattr(huesped_rel, 'numero_documento', '') if huesped_rel else '')
+        )
+    def __getattr__(self, name):
+        return getattr(self._perfil, name)
+
+
+@login_required
+def gestion_usuarios(request):
+    if not tiene_rol(request.user, ['Administrador']):
+        messages.error(request, 'Solo el Administrador puede gestionar usuarios y roles.')
+        return redirect('dashboard')
+
+    roles = Rol.objects.all()
+    roles_fijos = ['Administrador', 'Gerente', 'Recepcionista', 'Cliente']
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion', 'crear')
+        if accion == 'crear':
+            username = request.POST.get('username', '').strip()
+            email = request.POST.get('email', '').strip()
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            telefono = request.POST.get('telefono', '').strip()
+            documento = request.POST.get('documento', '').strip()
+            password = request.POST.get('password', '').strip()
+            rol_valor = (request.POST.get('rol_id') or request.POST.get('rol') or '').strip()
+
+            if not username or not password or not rol_valor:
+                messages.error(request, 'Usuario, contraseña y rol son obligatorios.')
+                return redirect('gestion_usuarios')
+
+            if User.objects.filter(username__iexact=username).exists():
+                messages.error(request, 'Ese nombre de usuario ya existe.')
+                return redirect('gestion_usuarios')
+
+            if PerfilUsuario.objects.filter(documento__iexact=documento).exists():
+                messages.error(request, 'numero de documento ya existe.')
+                return redirect('gestion_usuarios')
+
+            if rol_valor.isdigit():
+                rol_obj = get_object_or_404(Rol, id=int(rol_valor))
+            else:
+                rol_obj, _ = Rol.objects.get_or_create(
+                    nombre=rol_valor,
+                    defaults={'descripcion': f'Rol {rol_valor}'}
+                )
+
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            PerfilUsuario.objects.create(
+                usuario=user,
+                rol=rol_obj,
+                telefono=telefono,
+                documento=documento,
+                activo=True,
+            )
+            messages.success(request, f'Usuario {username} creado con rol {rol_obj.nombre}.')
+            return redirect('gestion_usuarios')
+
+        elif accion == 'editar':
+            user_id = request.POST.get('user_id')
+            usuario_edit = get_object_or_404(User, id=int(user_id))
+            usuario_edit.first_name = request.POST.get('first_name', '').strip()
+            usuario_edit.last_name = request.POST.get('last_name', '').strip()
+            usuario_edit.email = request.POST.get('email', '').strip()
+            activo = request.POST.get('activo') == 'on' if 'activo' in request.POST else True
+            usuario_edit.is_active = activo
+            usuario_edit.save()
+
+            rol_valor = (request.POST.get('rol_id') or request.POST.get('rol') or '').strip()
+            telefono = request.POST.get('telefono', '').strip()
+            documento = request.POST.get('documento', '').strip()
+            if rol_valor.isdigit():
+                rol_obj = get_object_or_404(Rol, id=int(rol_valor))
+            else:
+                rol_obj, _ = Rol.objects.get_or_create(
+                    nombre=rol_valor,
+                    defaults={'descripcion': f'Rol {rol_valor}'}
+                )
+
+            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=usuario_edit, defaults={'rol': rol_obj})
+            perfil.rol = rol_obj
+            perfil.telefono = telefono
+            perfil.documento = documento
+            if PerfilUsuario.objects.filter(documento__iexact=documento).exists():
+                messages.error(request, 'numero de documento ya existe.')
+                return redirect('gestion_usuarios')
+
+            perfil.activo = activo
+            perfil.save()
+
+            messages.success(request, f'Usuario {usuario_edit.username} actualizado.')
+            return redirect('gestion_usuarios')
+
+    q = request.GET.get('q', '').strip()
+    rol_filtro = request.GET.get('rol', '').strip()
+
+    perfiles_qs = PerfilUsuario.objects.select_related('usuario', 'rol').order_by('id')
+    if q:
+        perfiles_qs = perfiles_qs.filter(
+            Q(usuario__username__icontains=q) |
+            Q(usuario__first_name__icontains=q) |
+            Q(usuario__last_name__icontains=q) |
+            Q(usuario__email__icontains=q) |
+            Q(telefono__icontains=q)
+        )
+    if rol_filtro:
+        perfiles_qs = perfiles_qs.filter(rol__nombre__iexact=rol_filtro)
+
+    perfiles_envueltos = [_PerfilVista(p) for p in perfiles_qs]
+
+    return render(request, 'modulos/usuarios.html', {
+        'rol_actual': obtener_rol_usuario(request.user),
+        'active_menu': 'usuarios',
+        'page_obj': _paginar(request, perfiles_envueltos),
+        'usuarios': User.objects.select_related('perfil', 'perfil__rol').order_by('id'),
+        'roles': roles,
+        'roles_fijos': roles_fijos,
+        'q': q,
+        'rol_filtro': rol_filtro,
+    })
+
+
+@login_required
+def editar_usuario_panel(request, perfil_id):
+    if not tiene_rol(request.user, ['Administrador']):
+        messages.error(request, 'Solo el Administrador puede editar usuarios.')
+        return redirect('dashboard')
+    perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario', 'rol'), id=perfil_id)
+    if request.method == 'POST':
+        post_data = request.POST.copy()
+        post_data['accion'] = 'editar'
+        post_data['user_id'] = str(perfil.usuario.id)
+        if 'activo' not in post_data:
+            post_data['activo'] = 'on' if perfil.activo else ''
+        request.POST = post_data
+    return gestion_usuarios(request)
+
+
+@login_required
+def toggle_usuario_panel(request, perfil_id):
+    if not tiene_rol(request.user, ['Administrador']):
+        messages.error(request, 'Solo el Administrador puede cambiar el estado de usuarios.')
+        return redirect('dashboard')
+    perfil = get_object_or_404(PerfilUsuario.objects.select_related('usuario'), id=perfil_id)
+    nuevo_estado = not perfil.activo
+    perfil.activo = nuevo_estado
+    perfil.save(update_fields=['activo'])
+    perfil.usuario.is_active = nuevo_estado
+    perfil.usuario.save(update_fields=['is_active'])
+    messages.success(request, f'Usuario {perfil.usuario.username} {"activado" if nuevo_estado else "desactivado"}.')
+    return redirect('gestion_usuarios')

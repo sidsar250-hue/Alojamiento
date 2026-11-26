@@ -114,44 +114,68 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // 1. Calendario principal de búsqueda
     const formFiltro = detalleContainer.querySelector('form[method="get"]');
+    const filtroEntrada = formFiltro ? formFiltro.querySelector('input[name="fecha_entrada"]') : null;
+    const filtroSalida = formFiltro ? formFiltro.querySelector('input[name="fecha_salida"]') : null;
+
     if (formFiltro) {
       iniciarCalendarioRango(
         formFiltro.querySelector('#rangoFechasFiltro'),
-        formFiltro.querySelector('input[name="fecha_entrada"]'),
-        formFiltro.querySelector('input[name="fecha_salida"]'),
-        todosApartados
+        filtroEntrada,
+        filtroSalida,
+        todosApartados,
+        function () {
+          document.querySelectorAll('[id^="modalReservar"]').forEach(sincronizarModal);
+        }
       );
     }
 
-    // 2. Calendario por habitación dentro de cada modal con cálculo en vivo
-    Object.keys(fechasOcupadasPorHab).forEach((habId) => {
-      const modal = document.getElementById(`modalReservar${habId}`);
+    // 2. Sincronizar fechas del filtro superior en cada modal (solo lectura, sin editar)
+    function sincronizarModal(modal) {
       if (!modal) return;
-
-      const bloqueadasHab = fechasOcupadasPorHab[habId] || [];
       const precioNoche = parseFloat((modal.getAttribute('data-precio-noche') || '0').replace(',', '.'));
+      const inputTexto = modal.querySelector('.rango-fechas-modal');
+      const hiddenEntrada = modal.querySelector('input[name="fecha_entrada"]');
+      const hiddenSalida = modal.querySelector('input[name="fecha_salida"]');
       const resumenBox = modal.querySelector('.resumen-precio-modal');
+      const btnConfirmar = modal.querySelector('.btn-confirmar-reserva');
 
-      iniciarCalendarioRango(
-        modal.querySelector('.rango-fechas-modal'),
-        modal.querySelector('input[name="fecha_entrada"]'),
-        modal.querySelector('input[name="fecha_salida"]'),
-        bloqueadasHab,
-        function (dIn, dOut) {
-          if (!resumenBox) return;
-          if (!dIn || !dOut) {
-            resumenBox.innerHTML = `<span class="text-muted">Selecciona fecha de entrada y salida en el calendario.</span>`;
-            return;
-          }
-          const noches = Math.round((dOut - dIn) / (1000 * 60 * 60 * 24));
-          if (noches > 0) {
-            const total = noches * precioNoche;
+      const f1 = (filtroEntrada && filtroEntrada.value) || (hiddenEntrada && hiddenEntrada.value) || '';
+      const f2 = (filtroSalida && filtroSalida.value) || (hiddenSalida && hiddenSalida.value) || '';
+
+      if (hiddenEntrada) hiddenEntrada.value = f1;
+      if (hiddenSalida) hiddenSalida.value = f2;
+
+      if (f1 && f2) {
+        if (inputTexto) inputTexto.value = `${f1}  a  ${f2}`;
+        const dIn = new Date(f1 + 'T00:00:00');
+        const dOut = new Date(f2 + 'T00:00:00');
+        const noches = Math.round((dOut - dIn) / (1000 * 60 * 60 * 24));
+        if (noches > 0) {
+          const total = noches * precioNoche;
+          if (resumenBox) {
             resumenBox.innerHTML = `<span class="text-success">Estadía de ${noches} noche(s) × ${formatearCOP(precioNoche)} = <strong>Total: ${formatearCOP(total)}</strong></span>`;
-          } else {
-            resumenBox.innerHTML = `<span class="text-danger">Selecciona al menos 1 noche válida.</span>`;
           }
+          if (btnConfirmar) btnConfirmar.disabled = false;
+        } else {
+          if (resumenBox) {
+            resumenBox.innerHTML = `<span class="text-danger">La fecha de salida debe ser posterior a la de entrada.</span>`;
+          }
+          if (btnConfirmar) btnConfirmar.disabled = true;
         }
-      );
+      } else {
+        if (inputTexto) inputTexto.value = '';
+        if (resumenBox) {
+          resumenBox.innerHTML = `<span class="text-warning text-dark">Primero selecciona entrada y salida en el calendario superior.</span>`;
+        }
+        if (btnConfirmar) btnConfirmar.disabled = true;
+      }
+    }
+
+    document.querySelectorAll('[id^="modalReservar"]').forEach((modal) => {
+      sincronizarModal(modal);
+      modal.addEventListener('show.bs.modal', function () {
+        sincronizarModal(modal);
+      });
     });
   }
 

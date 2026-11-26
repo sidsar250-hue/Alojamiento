@@ -61,7 +61,13 @@
                 </div>
               </div>
             </td>
-            <td>{{ p.tipo_documento }} {{ p.documento }}</td>
+            <td>
+              {% if p.documento %}
+                {{ p.tipo_documento }} {{ p.documento }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
             <td><span class="badge badge-teal">{{ p.rol.nombre }}</span></td>
             <td>{{ p.telefono|default:"—" }}</td>
             <td>
