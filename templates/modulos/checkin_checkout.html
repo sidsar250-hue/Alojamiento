@@ -67,11 +67,17 @@
                 <td class="fw-semibold {% if r.saldo_pendiente > 0 %}text-danger{% else %}text-success{% endif %}">
                   ${{ r.saldo_pendiente|floatformat:0|intcomma }}
                 </td>
-                <td class="text-end">
-                  <form method="post" action="{% url 'procesar_checkout' r.id %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Check-out</button>
-                  </form>
+                <td class="text-end">                  
+                  {% if r.saldo_pendiente > 0 %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Saldo pendiente por pagar">
+                      Saldo pendiente
+                    </button>
+                  {% else %}
+                    <form method="post" action="{% url 'procesar_checkout' r.id %}" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Check-out</button>
+                    </form>
+                  {% endif %}
                 </td>
               </tr>
             {% empty %}

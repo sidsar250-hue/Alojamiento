@@ -31,6 +31,7 @@ urlpatterns = [
     path('panel/alojamiento/<int:alojamiento_id>/subir-imagenes/', views.subir_imagenes_alojamiento, name='subir_imagenes_alojamiento'),
     path('panel/alojamiento/imagen/<int:imagen_id>/principal/', views.marcar_imagen_principal, name='marcar_imagen_principal'),
     path('panel/alojamiento/imagen/<int:imagen_id>/eliminar/', views.eliminar_imagen_alojamiento, name='eliminar_imagen_alojamiento'),
+    path('panel/alojamiento/<int:alojamiento_id>/eliminar/', views.eliminar_alojamiento, name='eliminar_alojamiento'),
 
     path('panel/habitaciones/', views.gestion_habitaciones, name='gestion_habitaciones'),
     path('panel/habitaciones/crear/', views.crear_habitacion_panel, name='crear_habitacion'),

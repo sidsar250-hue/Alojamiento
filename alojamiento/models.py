@@ -240,6 +240,30 @@ class Reserva(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
+    @property
+    def total_servicios(self):
+        return sum((s.subtotal or 0) for s in self.servicios_adicionales.all())
+
+    @property
+    def valor_total(self):
+        base = (self.precio_noche or 0) * (self.noches or 0)
+        if base > 0:
+            return base + self.total_servicios
+        return self.total_estimado or 0
+
+    @property
+    def total_pagado(self):
+        return sum(
+            (p.monto or 0)
+            for p in self.pagos.all()
+            if getattr(p, 'estado', 'REGISTRADO') == 'REGISTRADO'
+        )
+
+    @property
+    def saldo_pendiente(self):
+        saldo = self.valor_total - self.total_pagado
+        return saldo if saldo > 0 else 0
+
     class Meta:
         verbose_name = 'Reserva'
         verbose_name_plural = 'Reservas'

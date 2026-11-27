@@ -566,33 +566,62 @@ def gestion_estadias_pagos(request):
         messages.error(request, 'No tienes permiso para acceder a estadías y pagos.')
         return redirect('dashboard')
 
-    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').prefetch_related('pagos', 'servicios_adicionales', 'novedades')
+    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').prefetch_related(
+        'pagos', 'servicios_adicionales', 'novedades'
+    )
 
     if request.method == 'POST':
         accion = request.POST.get('accion')
-        reserva = get_object_or_404(Reserva, id=int(request.POST.get('reserva_id')))
+        reserva = get_object_or_404(
+            Reserva.objects.select_related('habitacion', 'huesped').prefetch_related('pagos', 'servicios_adicionales'),
+            id=int(request.POST.get('reserva_id'))
+        )
+
+        # Bloqueo global para reservas cerradas o canceladas
+        if reserva.estado in ['FINALIZADA', 'CANCELADA']:
+            messages.error(
+                request,
+                f'La reserva {reserva.codigo} está {reserva.get_estado_display().lower()} y no admite nuevos movimientos.'
+            )
+            return redirect('gestion_estadias_pagos')
 
         if accion == 'pago':
             monto = Decimal(request.POST.get('monto', '0').replace(',', '.') or '0')
             metodo = request.POST.get('metodo', 'EFECTIVO').strip()
             referencia = request.POST.get('referencia', '').strip()
             notas = request.POST.get('notas', '').strip()
-            if monto > 0:
-                Pago.objects.create(
-                    reserva=reserva,
-                    monto=monto,
-                    metodo=metodo,
-                    referencia=referencia,
-                    registrado_por=request.user,
-                    notas=notas,
+
+            if reserva.saldo_pendiente <= 0:
+                messages.warning(request, f'La reserva {reserva.codigo} ya tiene saldo $0.')
+                return redirect('gestion_estadias_pagos')
+
+            if monto <= 0:
+                messages.error(request, 'El monto del pago debe ser mayor a $0.')
+                return redirect('gestion_estadias_pagos')
+
+            if monto > reserva.saldo_pendiente:
+                messages.error(
+                    request,
+                    f'El monto ingresado (${monto:,.0f}) supera el saldo pendiente de ${reserva.saldo_pendiente:,.0f}.'
                 )
-                messages.success(request, f'Pago de ${monto:,.0f} registrado en {reserva.codigo}.')
+                return redirect('gestion_estadias_pagos')
+
+            Pago.objects.create(
+                reserva=reserva,
+                monto=monto,
+                metodo=metodo,
+                referencia=referencia,
+                registrado_por=request.user,
+                notas=notas,
+            )
+            messages.success(request, f'Pago de ${monto:,.0f} registrado en {reserva.codigo}.')
             return redirect('gestion_estadias_pagos')
 
         elif accion == 'servicio':
             nombre_serv = request.POST.get('nombre_servicio', '').strip()
             cantidad = int(request.POST.get('cantidad', '1') or 1)
             precio_u = Decimal(request.POST.get('precio_unitario', '0').replace(',', '.') or '0')
+
             if nombre_serv and cantidad > 0 and precio_u >= 0:
                 subtotal = cantidad * precio_u
                 ServicioAdicional.objects.create(
@@ -610,6 +639,14 @@ def gestion_estadias_pagos(request):
         elif accion == 'novedad':
             tipo = request.POST.get('tipo', 'NOVEDAD').strip()
             descripcion = request.POST.get('descripcion', '').strip()
+
+            if tipo == 'CHECK_OUT' and reserva.saldo_pendiente > 0:
+                messages.error(
+                    request,
+                    f'No se puede hacer check-out en {reserva.codigo}: tiene un saldo pendiente de ${reserva.saldo_pendiente:,.0f}.'
+                )
+                return redirect('gestion_estadias_pagos')
+
             if descripcion:
                 NovedadEstadia.objects.create(
                     reserva=reserva,
@@ -631,8 +668,6 @@ def gestion_estadias_pagos(request):
             return redirect('gestion_estadias_pagos')
 
     return render(request, 'modulos/checkin_checkout.html', {
-        'rol_actual': obtener_rol_usuario(request.user),
-        'active_menu': 'checkin',
         'rol_actual': obtener_rol_usuario(request.user),
         'active_menu': 'checkin_checkout',
         'reservas': reservas,
@@ -704,26 +739,95 @@ def gestion_checkin_checkout(request):
     })
 
 
+class _PagoVista:
+    def __init__(self, pago):
+        self._pago = pago
+        self.id = pago.id
+        self.reserva = pago.reserva
+        self.monto = pago.monto
+        self.fecha_pago = getattr(pago, 'fecha_pago', getattr(pago, 'creado_en', None))
+
+        if hasattr(pago, 'get_metodo_pago_display'):
+            self.get_metodo_pago_display = pago.get_metodo_pago_display()
+        elif hasattr(pago, 'get_metodo_display'):
+            self.get_metodo_pago_display = pago.get_metodo_display()
+        else:
+            self.get_metodo_pago_display = getattr(pago, 'metodo_pago', getattr(pago, 'metodo', 'Efectivo'))
+
+        if hasattr(pago, 'get_tipo_pago_display'):
+            self.get_tipo_pago_display = pago.get_tipo_pago_display()
+        elif hasattr(pago, 'get_tipo_display'):
+            self.get_tipo_pago_display = pago.get_tipo_display()
+        else:
+            self.get_tipo_pago_display = getattr(pago, 'tipo_pago', getattr(pago, 'tipo', 'Abono / Pago'))
+
+    def __getattr__(self, name):
+        return getattr(self._pago, name)
+
+
 @login_required
 def gestion_pagos(request):
     if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
         messages.error(request, 'No tienes permiso para acceder a Pagos.')
         return redirect('dashboard')
+
     if request.method == 'POST':
+        reserva_id = request.POST.get('reserva_id') or request.POST.get('reserva')
+        reserva = Reserva.objects.prefetch_related('pagos', 'servicios_adicionales').filter(id=reserva_id).first()
+
+        if not reserva:
+            messages.error(request, 'Debes seleccionar una reserva válida.')
+            return redirect('gestion_pagos')
+
+        if reserva.estado in ['FINALIZADA', 'CANCELADA']:
+            messages.error(
+                request,
+                f'No se pueden registrar pagos en la reserva {reserva.codigo} porque está {reserva.get_estado_display().lower()}.'
+            )
+            return redirect('gestion_pagos')
+
+        if reserva.saldo_pendiente <= 0:
+            messages.warning(
+                request,
+                f'La reserva {reserva.codigo} ya no tiene saldo pendiente por pagar.'
+            )
+            return redirect('gestion_pagos')
+
         post_data = request.POST.copy()
         post_data['accion'] = 'pago'
+        post_data['reserva_id'] = str(reserva.id)
+        if 'metodo_pago' in post_data and 'metodo' not in post_data:
+            post_data['metodo'] = post_data['metodo_pago']
         request.POST = post_data
         gestion_estadias_pagos(request)
         return redirect('gestion_pagos')
-    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').prefetch_related('pagos', 'servicios_adicionales')
-    pagos = Pago.objects.select_related('reserva', 'reserva__huesped', 'reserva__alojamiento').all()
+
+    reservas_qs = (
+        Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped')
+        .prefetch_related('pagos', 'servicios_adicionales')
+        .exclude(estado__in=['FINALIZADA', 'CANCELADA'])
+        .order_by('-id')
+    )
+    reservas = [r for r in reservas_qs if r.saldo_pendiente > 0]
+
+    pagos_qs = Pago.objects.select_related('reserva', 'reserva__huesped', 'reserva__alojamiento').order_by('-id')
+    pagos_envueltos = [_PagoVista(p) for p in pagos_qs]
+
+    metodos_pago = [
+        ('EFECTIVO', 'Efectivo'),
+        ('TRANSFERENCIA', 'Transferencia'),
+        ('TARJETA', 'Tarjeta'),
+        ('NEQUI_DAVIPLATA', 'Nequi / Daviplata'),
+    ]
+
     return render(request, 'modulos/pagos.html', {
         'rol_actual': obtener_rol_usuario(request.user),
         'active_menu': 'pagos',
+        'page_obj': _paginar(request, pagos_envueltos),
         'reservas': reservas,
-        'pagos': pagos,
+        'pagos': pagos_envueltos,
+        'metodos_pago': metodos_pago,
     })
-
 
 
 @login_required
@@ -1045,7 +1149,7 @@ def guardar_alojamiento_panel(request):
                 estado='ACTIVO',
             )
             for idx, img in enumerate(request.FILES.getlist('imagenes')):
-                ImagenAlojamiento.objects.create(alojamiento=aloj, imagen=img, es_principal=(idx == 0))
+                ImagenAlojamiento.objects.create(alojamiento=aloj, imagen=img)
             messages.success(request, f'Alojamiento "{aloj.nombre}" creado.')
             return redirect(f"/panel/alojamiento/?id={aloj.id}")
     return redirect('gestion_alojamiento')
@@ -1221,8 +1325,18 @@ def procesar_checkin(request, reserva_id):
 
 @login_required
 def procesar_checkout(request, reserva_id):
-    reserva = get_object_or_404(Reserva, id=reserva_id)
+    reserva = get_object_or_404(
+        Reserva.objects.select_related('habitacion', 'huesped').prefetch_related('pagos', 'servicios_adicionales'),
+        id=reserva_id
+    )
     if request.method == 'POST':
+        if reserva.saldo_pendiente > 0:
+            messages.error(
+                request,
+                f'No se puede completar el check-out de {reserva.codigo}: tiene un saldo pendiente de ${reserva.saldo_pendiente:,.0f}. Registra el pago antes de finalizar.'
+            )
+            return redirect('gestion_checkin_checkout')
+
         reserva.estado = 'FINALIZADA'
         reserva.save(update_fields=['estado', 'actualizado_en'])
         reserva.habitacion.estado = 'DISPONIBLE'
@@ -1235,28 +1349,6 @@ def procesar_checkout(request, reserva_id):
         )
         messages.success(request, f'Check-out registrado para la reserva {reserva.codigo}.')
     return redirect('gestion_checkin_checkout')
-
-
-@login_required
-def gestion_pagos(request):
-    if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
-        messages.error(request, 'No tienes permiso para acceder a Pagos.')
-        return redirect('dashboard')
-    pagos_qs = Pago.objects.select_related('reserva', 'reserva__huesped', 'reserva__alojamiento').all()
-    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').all()
-    metodos_pago = [
-        ('EFECTIVO', 'Efectivo'),
-        ('TRANSFERENCIA', 'Transferencia'),
-        ('TARJETA', 'Tarjeta'),
-        ('NEQUI_DAVIPLATA', 'Nequi / Daviplata'),
-    ]
-    return render(request, 'modulos/pagos.html', {
-        'rol_actual': obtener_rol_usuario(request.user),
-        'active_menu': 'pagos',
-        'page_obj': _paginar(request, pagos_qs),
-        'reservas': reservas,
-        'metodos_pago': metodos_pago,
-    })
 
 
 @login_required
@@ -1317,18 +1409,43 @@ def asociar_servicio_reserva(request):
     if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
         messages.error(request, 'No tienes permiso para asociar servicios.')
         return redirect('gestion_servicios')
+
     if request.method == 'POST':
         reserva_id = request.POST.get('reserva') or request.POST.get('reserva_id')
+        if not reserva_id or not str(reserva_id).isdigit():
+            messages.error(request, 'Debes seleccionar una reserva válida.')
+            return redirect('gestion_servicios')
+
         reserva = get_object_or_404(Reserva, id=int(reserva_id))
+
+        if reserva.estado in ['FINALIZADA', 'CANCELADA']:
+            messages.error(
+                request,
+                f'No se pueden asociar servicios a la reserva {reserva.codigo} porque está {reserva.get_estado_display().lower()}.'
+            )
+            return redirect('gestion_servicios')
+
         servicio_id = request.POST.get('servicio')
         cantidad = int(request.POST.get('cantidad', '1') or 1)
+        if cantidad <= 0:
+            messages.error(request, 'La cantidad debe ser mayor a 0.')
+            return redirect('gestion_servicios')
+
         if servicio_id and servicio_id.isdigit():
             serv_cat = ServicioAdicional.objects.filter(id=int(servicio_id)).first()
-            nombre_serv = serv_cat.nombre if serv_cat else 'Servicio adicional'
-            precio_u = getattr(serv_cat, 'precio', getattr(serv_cat, 'precio_unitario', Decimal('0')))
+            if not serv_cat:
+                messages.error(request, 'El servicio seleccionado no existe.')
+                return redirect('gestion_servicios')
+            nombre_serv = serv_cat.nombre
+            precio_u = (
+                getattr(serv_cat, 'precio', None)
+                or getattr(serv_cat, 'precio_unitario', None)
+                or Decimal('0')
+            )
         else:
             nombre_serv = request.POST.get('nombre_servicio', 'Servicio adicional').strip()
             precio_u = Decimal(request.POST.get('precio_unitario', '0').replace(',', '.') or '0')
+
         subtotal = Decimal(cantidad) * Decimal(precio_u)
         ServicioAdicional.objects.create(
             reserva=reserva,
@@ -1340,50 +1457,63 @@ def asociar_servicio_reserva(request):
         reserva.total_estimado = (reserva.total_estimado or Decimal('0')) + subtotal
         reserva.save(update_fields=['total_estimado', 'actualizado_en'])
         messages.success(request, f'Servicio "{nombre_serv}" asociado a {reserva.codigo}.')
+
     return redirect('gestion_servicios')
 
 class _ConsumoVista:
     def __init__(self, consumo):
         self._consumo = consumo
         self.id = consumo.id
-        self.reserva = consumo.reserva
+        self.reserva = getattr(consumo, 'reserva', None)
         self.cantidad = getattr(consumo, 'cantidad', 1)
-        self.subtotal = getattr(consumo, 'subtotal', getattr(consumo, 'precio_unitario', 0))
+        self.subtotal = getattr(consumo, 'subtotal', 0)
 
-        serv_attr = getattr(consumo, 'servicio', None)
-        nombre_texto = (
-            getattr(consumo, 'nombre', None)
-            or getattr(consumo, 'nombre_servicio', None)
-            or (serv_attr.nombre if hasattr(serv_attr, 'nombre') else (serv_attr if isinstance(serv_attr, str) else ''))
-            or 'Servicio adicional'
+        precio = (
+            getattr(consumo, 'precio_unitario', None)
+            or getattr(consumo, 'precio', None)
+            or self.subtotal
+            or 0
         )
+        self.precio_unitario = precio
+        self.precio = precio
 
-        if hasattr(serv_attr, 'nombre'):
-            self.servicio = serv_attr
-        else:
-            self.servicio = type('ServicioObj', (), {'nombre': nombre_texto})()
-
-        self.nombre = nombre_texto
+        nombre = getattr(consumo, 'nombre', '') or getattr(consumo, 'nombre_servicio', '')
+        self.nombre = nombre
+        self.nombre_servicio = nombre
+        self.servicio = type('ServicioNombre', (), {'nombre': nombre, 'precio': precio})()
 
     def __getattr__(self, name):
         return getattr(self._consumo, name)
-
+@login_required
 @login_required
 def gestion_servicios(request):
     if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento', 'Recepcionista']):
         messages.error(request, 'No tienes permiso para acceder a Servicios.')
         return redirect('dashboard')
+
     consumos_qs = ServicioAdicional.objects.select_related('reserva', 'reserva__huesped').order_by('-id')
     consumos = [_ConsumoVista(c) for c in consumos_qs]
-    reservas = Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped').order_by('-id')
+
+    catalogo_por_nombre = {}
+    for c in consumos:
+        clave = c.nombre.strip().lower()
+        if clave and clave not in catalogo_por_nombre:
+            catalogo_por_nombre[clave] = c
+    catalogo = list(catalogo_por_nombre.values())
+
+    reservas = (
+        Reserva.objects.select_related('alojamiento', 'habitacion', 'huesped')
+        .exclude(estado__in=['FINALIZADA', 'CANCELADA'])
+        .order_by('-id')
+    )
+
     return render(request, 'modulos/servicios.html', {
         'rol_actual': obtener_rol_usuario(request.user),
         'active_menu': 'servicios',
-        'servicios': consumos,
+        'servicios': catalogo,
         'consumos': consumos,
         'reservas': reservas,
     })
-
 
 class _PerfilVista:
     def __init__(self, perfil):
@@ -1560,3 +1690,30 @@ def toggle_usuario_panel(request, perfil_id):
     perfil.usuario.save(update_fields=['is_active'])
     messages.success(request, f'Usuario {perfil.usuario.username} {"activado" if nuevo_estado else "desactivado"}.')
     return redirect('gestion_usuarios')
+
+@login_required
+def eliminar_alojamiento(request, alojamiento_id):
+    if not tiene_rol(request.user, ['Administrador', 'Gestor de Alojamiento']):
+        messages.error(request, 'No tienes permiso para eliminar alojamientos.')
+        return redirect('gestion_alojamiento')
+
+    if request.method == 'POST':
+        aloj = get_object_or_404(Alojamiento, id=alojamiento_id)
+
+        tiene_reservas_activas = Reserva.objects.filter(
+            alojamiento=aloj,
+            estado__in=['PENDIENTE', 'CONFIRMADA', 'EN_CURSO'],
+        ).exists()
+
+        if tiene_reservas_activas:
+            messages.error(
+                request,
+                f'No se puede eliminar "{aloj.nombre}" porque tiene reservas activas.'
+            )
+            return redirect('gestion_alojamiento')
+
+        nombre = aloj.nombre
+        aloj.delete()
+        messages.success(request, f'Alojamiento "{nombre}" eliminado correctamente.')
+
+    return redirect('gestion_alojamiento')
